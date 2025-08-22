@@ -5,62 +5,71 @@
 \geometry{a4paper, margin=1in}
 \begin{document}
 
-\title{Risk Sizing for Leveraged Crypto Arbitrage}
+\title{A Rigorous Framework for Optimal Sizing in Leveraged Arbitrage: From Kelly to Distributionally Robust Optimization}
 \author{AI Quant Researcher}
 \date{\today}
 \maketitle
 
-\section{Introduction}
-This document details a risk sizing module for leveraged crypto arbitrage, incorporating Kelly optimization, model uncertainty, and drawdown constraints.
+\section*{Part A: Theoretical Foundations and Mathematical Derivations}
 
-\section{Theoretical Foundations}
+\subsection*{1. The Classical Kelly Criterion: Maximizing Asymptotic Growth}
 
-\subsection{Classical Kelly Criterion}
-The Kelly criterion maximizes long-term wealth growth by finding the optimal fraction $f^*$ of capital to bet. For repeated independent bets with win probability $p$, win payoff $b$, and loss $a$, the final wealth $W_N$ after $N$ trials is:
+\subsubsection*{1.1 Derivation for Repeated Independent Bets}
+Let $W_0$ be initial wealth. After $N$ trials with $W$ wins and $L$ losses, where $N = W+L$, the final wealth $W_N$ for a betting fraction $f$ is:
 $$W_N(f) = W_0 (1+fb)^W (1-fa)^L$$
-Maximizing the geometric growth rate is equivalent to maximizing the expected log-return:
-$$g(f) = E[\log(1+fR)] = p\log(1+fb) + (1-p)\log(1-fa)$$
-The optimal fraction $f^*$ is found by setting $\frac{dg}{df} = 0$:
-$$f^* = \frac{pb - (1-p)a}{ab}$$
-For $a=1$, $f^* = \frac{pb - (1-p)}{b}$.  For continuous returns with mean $\mu$ and variance $\sigma^2$, $f^* \approx \frac{\mu}{\sigma^2}$.
+where $p$ is the win probability, $b$ is the win payoff, and $a$ is the loss size (fraction of stake lost). The objective is to maximize the geometric growth rate, which is equivalent to maximizing the expected log-return per trial, $g(f)$:
+$$g(f) = E[\log(\frac{W_N}{W_0})^{\frac{1}{N}}] = p\log(1+fb) + (1-p)\log(1-fa)$$
+Setting the derivative to zero, $\frac{dg}{df} = 0$, gives:
+$$\frac{pb}{1+fb} - \frac{(1-p)a}{1-fa} = 0 \implies f^* = \frac{pb - (1-p)a}{ab}$$
+For the common case where $a=1$, this simplifies to $f^* = \frac{pb - (1-p)}{b} = p - \frac{1-p}{b}$.  For continuously distributed excess returns with mean $\mu$ and variance $\sigma^2$, the optimal fraction is $f^* = \frac{\mu}{\sigma^2}$.
 
-\textbf{Assumptions and Failure Modes:}
+\subsubsection*{1.2 Core Assumptions and Critical Failure Modes}
+The Kelly criterion relies on several key assumptions:
 \begin{itemize}
-    \item \textbf{Known parameters:} $p$, $b$, and $a$ are assumed known, but are estimated in practice. Errors in these estimates, especially overestimating $p$ or $b$, can lead to significant overbetting and potential ruin.
-    \item \textbf{IID trials:}  Assumes independent and identically distributed returns, which is often violated in financial markets.
-    \item \textbf{Frictionless markets:} Ignores transaction costs and slippage.
+    \item \textbf{Known parameters:} Accurate knowledge of $p$, $b$, and $a$. In reality, these are estimates subject to error. Overestimation, especially of $p$ or $b$, leads to overbetting and increased ruin risk.
+    \item \textbf{IID trials:} Assumes independent and identically distributed returns, often violated in markets due to regime changes and volatility clustering.
+    \item \textbf{Frictionless markets:} Ignores transaction costs, slippage, and market impact.
+    \item \textbf{Infinitely divisible capital:} Assumes bets can be any fraction of wealth, which may not be practical.
 \end{itemize}
 
-\subsection{Drawdown-Constrained Kelly}
-To address drawdown risk, we constrain the probability of a drawdown below a threshold $\alpha$ to be less than $\beta$:
-$$ \begin{array}{ll}
-\underset{f}{\text{maximize}} & g(f) \\
-\text{subject to} & P(\inf_t W_t \le \alpha W_0) \le \beta
-\end{array} $$
-This can be approximated by a convex constraint:
-$$ E[(1+fR)^{-\lambda}] \le 1, \quad \lambda = \frac{\log(\beta)}{\log(\alpha)} $$
-For discrete scenarios $r_i$ with probabilities $\pi_i$:
+\subsection*{2. Advanced Risk Control: Drawdown Constraints and Tail Modeling}
+
+\subsubsection*{2.1 Drawdown-Constrained Kelly as a Convex Optimization Problem}
+The Risk-Constrained Kelly (RCK) problem maximizes the expected log-growth subject to a constraint on the probability of a drawdown.  Given return scenarios $r_i$ with probabilities $\pi_i$, drawdown limit $\alpha \in (0,1)$, and maximum drawdown probability $\beta \in (0,1)$, the problem is:
 $$ \begin{array}{ll}
 \underset{f}{\text{maximize}} & \sum_i \pi_i \log(1+fr_i) \\
-\text{subject to} & \sum_i \pi_i (1+fr_i)^{-\lambda} \le 1
+\text{subject to} & P(\inf_t (1+fr_t) \le \alpha) \le \beta \\
+                    & 0 \le f \le 1/a
+\end{array} $$
+A tractable convex approximation uses a Chernoff bound:
+$$ \begin{array}{ll}
+\underset{f}{\text{maximize}} & \sum_i \pi_i \log(1+fr_i) \\
+\text{subject to} & \sum_i \pi_i (1+fr_i)^{-\lambda} \le 1 \\
+                    & 0 \le f \le 1/a \\
+                    & \lambda = \frac{\log(\beta)}{\log(\alpha)}
 \end{array} $$
 
-\subsection{Tail Risk Measures}
+\subsubsection*{2.2 Quantifying Tail Risk: VaR, CVaR, and Extreme Value Theory (EVT)}
 \textbf{Value-at-Risk (VaR):}  $\text{VaR}_{\alpha}(L) = \inf\{l : P(L > l) \le 1-\alpha \}$.
 \textbf{Conditional Value-at-Risk (CVaR):} $\text{CVaR}_{\alpha}(L) = E[L | L > \text{VaR}_{\alpha}(L)]$.
 
-\textbf{Extreme Value Theory (EVT):} The Pickands-Balkema-de Haan theorem states that excesses over a high threshold $u$ follow a Generalized Pareto Distribution (GPD):
+\textbf{Extreme Value Theory (EVT):} For a wide class of distributions, excesses over a high threshold $u$ follow a Generalized Pareto Distribution (GPD):
 $$G_{\xi, \sigma}(y) = 1 - (1 + \xi y/\sigma)^{-1/\xi}$$
-The Peaks-Over-Threshold (POT) method fits a GPD to excesses, estimating $\xi$ (tail index) and $\sigma$.
+where $\xi$ is the shape parameter (tail index) and $\sigma$ is the scale parameter. The Peaks-Over-Threshold (POT) method fits a GPD to excesses, estimating $\xi$ and $\sigma$.
 
-\subsection{Robustification Techniques}
+\subsection*{3. Robust Sizing Under Model and Parameter Uncertainty}
+
+\subsubsection*{3.1 Robustification Techniques}
 \begin{itemize}
-    \item \textbf{Fractional Kelly:}  Bet a fraction $k$ of $f^*$.
-    \item \textbf{Shrinkage:} Improve parameter estimates.
-    \item \textbf{Distributionally Robust Optimization (DRO):} Optimize for the worst-case distribution within an ambiguity set.
+    \item \textbf{Fractional Kelly:}  Bet a fraction $k \in (0, 1)$ of $f^*$, i.e., $f_{frac} = k f^*$.
+    \item \textbf{Shrinkage:} Improve parameter estimates by combining sample estimates with prior information or a structured target.
+    \item \textbf{Distributionally Robust Optimization (DRO):} Optimize for the worst-case distribution within an ambiguity set $\Pi$:
+    $$\max_f \min_{\pi \in \Pi} E_\pi[\log(1+fR)]$$
 \end{itemize}
 
-\subsection{Ruin Probability}
-The probability of ruin is related to the strategy's edge and bet size.  Betting above $f^*$ increases ruin risk.
+\subsubsection*{3.2 Theoretical Bounds on Ruin Probability}
+The probability of ruin is related to the strategy's edge and bet size.  Betting above $f^*$ increases ruin risk.  For a simple game with win probability $p > 0.5$, the probability of ruin approaches zero as the number of trials increases if $f < f^*$.
 
 \end{document}
+
+EDIT 7_Risk_Sizing_Kelly_Tail_Risk/kelly_optimization.ipynb
