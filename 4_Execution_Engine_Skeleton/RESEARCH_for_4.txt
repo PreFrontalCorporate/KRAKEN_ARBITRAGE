@@ -27,46 +27,62 @@
 \tableofcontents
 \newpage
 
-% ... (Existing content from previous response, omitted for brevity) ...
+\section{Formal Model of Order Types and Execution Semantics}
 
-\section{Enhancements for Queue Position and Fill Probability}
+We define the following order types and their execution semantics, incorporating queue position effects:
 
-\subsection{Modeling Queue Position}
-To incorporate queue position effects, we extend the LOB model.  Instead of aggregated volume $v_i^b$ at price $p_i^b$, we maintain an ordered list of orders at that price level:
-\[
-\mathcal{B}_t = \{(p_i^b, Q_i^b)\}_{i=1}^{N_b}
-\]
-where $Q_i^b = [(q_{i1}, t_{i1}), (q_{i2}, t_{i2}), \dots]$ is a queue of (quantity, submission time) tuples, ordered by submission time.  A similar structure applies to the ask side.
-
-When a limit order of size $q$ is submitted at price $p$, it is appended to the corresponding queue.  When a market order arrives, it consumes liquidity from the front of the queue at the best price.
-
-\subsection{Fill Probability Constraints}
-Fill probability for a limit order depends on its queue position, market volatility, and order flow dynamics.  A simplified model assumes a constant probability $\phi(p, q, pos)$ of being filled within a time interval $\Delta t$, where $p$ is the limit price, $q$ is the order size, and $pos$ is the queue position.
-
-The execution problem now includes a constraint:
-\[
-P(\sum_{i=0}^{N-1} v_i^{fill} = X) \ge 1 - \epsilon
-\]
-where $\epsilon$ is the maximum acceptable probability of not fully filling the parent order.  This constraint can be approximated using the fill probability model $\phi$.
-
-\section{Practical Implementation Details}
-
-\subsection{Mock Kraken API Enhancements}
-The Mock Kraken API should be extended to support:
-
+\subsection{Order Types}
 \begin{itemize}
-    \item \textbf{Queue Position Simulation:} Maintain order queues at each price level and simulate queue position effects on fill probability.
-    \item \textbf{WebSocket Stub:} Implement a basic WebSocket stub to simulate real-time market data updates.
-    \item \textbf{More Realistic Order Matching:} Implement a more sophisticated order matching engine that considers order types, queue position, and hidden orders.
+    \item \textbf{Limit Order $(p, q)$:}  An order to buy or sell $q$ units at a specified price $p$.  Enters the limit order book (LOB) at price level $p$ and waits to be filled.  The queue position $pos$ is determined by the order's submission time.
+    \item \textbf{Market Order $(q)$:} An order to buy or sell $q$ units at the best available price. Immediately executes against the opposite side of the LOB.
+    \item \textbf{Immediate-or-Cancel (IOC) Order $(p, q)$:} A limit order that must be executed immediately or partially.  Any unfilled portion is cancelled.
+    \item \textbf{Fill-or-Kill (FOK) Order $(p, q)$:} A limit order that must be executed entirely immediately or cancelled.
+    \item \textbf{Post-Only Order $(p, q)$:} A limit order that is only placed if it does not immediately execute.  This prevents taking liquidity and ensures the order enters the LOB.
 \end{itemize}
 
-\subsection{Execution Engine Enhancements}
-The Execution Engine should be enhanced to:
+\subsection{LOB and Queue Position}
+The LOB at time $t$ is represented as two ordered lists:
+\[
+\mathcal{B}_t = \{(p_i^b, Q_i^b)\}_{i=1}^{N_b} \quad \text{(Bids)}
+\]
+\[
+\mathcal{A}_t = \{(p_i^a, Q_i^a)\}_{i=1}^{N_a} \quad \text{(Asks)}
+\]
+where $Q_i^b$ and $Q_i^a$ are queues of $(quantity, submission\_time)$ tuples at each price level, ordered by submission time.
+
+\section{Execution Decision Problem}
+
+The execution decision problem is to choose the optimal order type and size to minimize expected cost and penalty, subject to fill probability constraints.
+
+\subsection{Objective Function}
+\[
+\min_{type, q} E[Cost(type, q) + Penalty(type, q)]
+\]
+where $Cost(type, q)$ is the execution cost and $Penalty(type, q)$ is a penalty for not filling the order within a certain time.
+
+\subsection{Fill Probability Constraint}
+\[
+P(\text{Fill}(type, q)) \ge 1 - \epsilon
+\]
+where $\epsilon$ is the maximum acceptable probability of not filling the order.
+
+\section{Post-Trade Checks}
 
 \begin{itemize}
-    \item \textbf{Queue Position Tracking:} Track the queue position of limit orders and use this information in execution decisions.
-    \item \textbf{Fill Probability Estimation:} Implement a method to estimate fill probability based on queue position, market conditions, and order flow.
-    \item \textbf{Advanced Order Types:} Implement support for more advanced order types, such as stop-loss orders and trailing stops.
+    \item \textbf{Fill Validation:} Verify that the filled quantity and price are consistent with the order details and market conditions.
+    \item \textbf{Idempotency:} Ensure that replaying the same order (e.g., due to network issues) does not result in duplicate fills.
+    \item \textbf{Reconciliation:} Regularly poll the exchange to synchronize the internal order status with the exchange's record.
+    \item \textbf{Risk Limits:} Implement risk limits for leveraged positions, such as maximum position size and margin requirements.
+\end{itemize}
+
+\section{Integration Tests}
+
+\begin{itemize}
+    \item \textbf{Order Lifecycle:} Test the full order lifecycle (place, cancel, fill, partial fill) for all order types.
+    \item \textbf{Idempotency Test:} Replay the same order multiple times and verify that only one fill occurs.
+    \item \textbf{Reconciliation Test:} Verify that the reconciliation routine correctly synchronizes order status.
+    \item \textbf{Risk Limit Test:} Test that risk limits are enforced and prevent exceeding position or margin limits.
+    \item \textbf{Queue Position Test:} Verify that queue position is correctly simulated and affects order execution.
 \end{itemize}
 
 \end{document}
