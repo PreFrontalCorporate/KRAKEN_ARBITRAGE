@@ -1,0 +1,81 @@
+\documentclass{article}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+
+\title{Adaptive Online Algorithms for Optimal Order Routing under Non-Stationarity: A Formal Treatment}
+\author{Quantitative Research Division}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\abstract{
+This document provides a formal mathematical treatment of adaptive online algorithms for the optimal selection of execution venue, order type, and routing strategy in non-stationary financial markets. We formalize the problem within the frameworks of Online Convex Optimization and Contextual Bandits, providing regret guarantees and analyzing algorithm behavior under adversarial conditions. We present Mirror Descent and its specialization, Exponentiated Gradient, deriving their update equations and regret bounds. We then extend this to contextual bandits, including Exp4 for adversarial settings and Thompson Sampling for Bayesian exploration, with specific adaptations for non-stationary environments such as sliding windows and change-point resets. The analysis concludes with a discussion of minimax regret in adversarial settings.
+}
+
+\section{Formalization of the Online Order Routing Problem}
+We model the problem as a sequential game over a time horizon $t=1, \dots, T$.
+
+\subsection{Action Set and Context Vector}
+The action set $\mathcal{A}$ is a finite set of $K$ composite actions. Each action $a \in \mathcal{A}$ is a tuple $a = (v, o)$, where $v$ is the venue and $o$ is the order type. At each time step $t$, the learner observes a context vector $x_t \in \mathcal{X} \subset \mathbb{R}^d$, containing market and order-specific features such as latency, spread, and depth.
+
+\subsection{Loss Function and Regret}
+The learner chooses an action $a_t \in \mathcal{A}$ and incurs a loss $\ell_t(a_t, x_t)$, representing execution cost (e.g., implementation shortfall). The sequence of loss functions $\{\ell_t\}_{t=1}^T$ can be chosen by an adversary. The objective is to minimize regret, defined as the difference between the learner's cumulative loss and that of a benchmark policy. For a non-stationary environment with $S$ change-points, the switching regret is a key metric:
+\begin{equation}
+    R_T^{\text{switch}}(S) = \sum_{t=1}^T \ell_t(a_t) - \min_{\pi \in \Pi_S} \sum_{t=1}^T \ell_t(\pi(t))
+\end{equation}
+where $\Pi_S$ is the set of policies with at most $S-1$ switches.
+
+\section{Mirror Descent and Exponentiated Gradient}
+In the Online Convex Optimization (OCO) setting, the learner's strategy is a probability distribution $p_t \in \Delta_K$ over the $K$ actions.
+
+\subsection{The Online Mirror Descent (OMD) Update}
+OMD generalizes Online Gradient Descent. Given a mirror map $\psi(\cdot)$ that is 1-strongly convex w.r.t. a norm $\|\cdot\|$, the update is:
+\begin{equation}
+    p_{t+1} = \arg\min_{p \in \Delta_K} \left\{ \eta_t \langle p, \hat{\ell}_t \rangle + D_\psi(p \| p_t) \right\}
+\end{equation}
+where $\eta_t$ is the learning rate, $\hat{\ell}_t$ is an unbiased estimate of the loss vector, and $D_\psi(p \| q) = \psi(p) - \psi(q) - \langle \nabla\psi(q), p - q \rangle$ is the Bregman divergence.
+
+\subsection{Exponentiated Gradient (EG)}
+Choosing the negative entropy $\psi(p) = \sum_{i=1}^K p_i \log p_i$ as the mirror map yields the EG algorithm. The update rule for the unnormalized weights $w_{t,i}$ is:
+\begin{equation}
+    w_{t+1, i} = w_{t, i} \exp(-\eta_t \hat{\ell}_{t, i})
+\end{equation}
+The new probability distribution is $p_{t+1, i} = w_{t+1, i} / \sum_{j=1}^K w_{t+1, j}$. This normalization is the projection onto the simplex $\Delta_K$.
+
+\subsection{Regret Bounds and Step-Size Selection}
+The regret of OMD is bounded by:
+\begin{equation}
+    R_T \le \frac{D_\psi(p^* \| p_1)}{\eta} + \frac{\eta}{2} \sum_{t=1}^T \|\hat{\ell}_t\|_*^2
+\end{equation}
+where $\|\cdot\|_*$ is the dual norm. With a time-varying step-size $\eta_t = c/\sqrt{t}$ and assuming $\|\hat{\ell}_t\|_\infty \le G$, the regret for EG is bounded by $R_T \le O(G\sqrt{T \log K})$. This bound is sublinear in $T$, ensuring the average regret approaches zero.
+
+\section{Contextual Bandits in Non-Stationary Environments}
+Contextual bandits explicitly learn a policy $\pi: \mathcal{X} \to \mathcal{A}$.
+
+\subsection{Thompson Sampling (TS) for Non-Stationarity}
+TS is a Bayesian algorithm. Assume a linear model for the expected reward of action $a$: $\mathbb{E}[r_t(a) | x_t] = x_t^T \beta_a$.
+\begin{enumerate}
+    \item Maintain a posterior over $\beta_a$, e.g., $\beta_a \sim \mathcal{N}(\mu_a, \Sigma_a)$.
+    \item At time $t$, sample $\tilde{\beta}_{t,a} \sim \mathcal{N}(\mu_{t-1,a}, \Sigma_{t-1,a})$ for each arm $a$.
+    \item Choose action $a_t = \arg\max_a x_t^T \tilde{\beta}_{t,a}$.
+    \item Observe reward $r_t$ and update the posterior for arm $a_t$ using Bayesian linear regression.
+\end{enumerate}
+For non-stationary environments, a \textbf{sliding-window} variant is used, where the posterior update at time $t$ only considers observations from $\{t-\tau+1, \dots, t\}$ for a window size $\tau$. The regret bound for such an algorithm in an environment with $S$ abrupt changes is typically of the order $\tilde{O}(\sqrt{ST})$.
+
+\subsection{Exp4 for Adversarial Contexts}
+Exp4 is designed for adversarial settings. It maintains a distribution over a set of $M$ expert policies. Its regret is bounded by $O(\sqrt{KT \log M})$ against the best expert. To handle non-stationarity, Exp4 can be combined with a reset mechanism. A \textbf{windowed-reset} variant would involve running a change-point detector over a recent window of prediction errors. If a change is detected, the weights over the experts are reset to uniform, forcing re-exploration.
+
+\section{Adversarial Settings and Change-Point Resets}
+\subsection{Minimax Regret}
+In an adversarial setting, the goal is to find an algorithm with the best possible worst-case guarantee. The minimax regret for the $K$-armed bandit problem is $\Omega(\sqrt{KT})$. Algorithms like Exp4 are designed to be minimax optimal.
+
+\subsection{Change-Point Detection for Resets}
+To adapt to abrupt changes, an online change-point detection mechanism can be used to trigger a reset of the learning algorithm. A common approach is to monitor a statistic based on the sequential likelihood ratio. Let $\theta_0$ be the pre-change parameter distribution and $\theta_1$ be the post-change distribution. A detector tracks a statistic like the CUSUM statistic:
+\begin{equation}
+    S_t = \max(0, S_{t-1} + \log \frac{f_{\theta_1}(y_t)}{f_{\theta_0}(y_t)})
+\end{equation}
+where $y_t$ is the observed reward or model residual at time $t$. A change is flagged if $S_t$ exceeds a threshold. When a change is detected, the bandit algorithm's state (e.g., weights in EG, posteriors in TS) is reset to an initial state, allowing it to adapt to the new regime. The regret bound then depends on the number of resets (change-points) $S$, e.g., $R_T = O(\sqrt{ST})$.
+
+\end{document}
