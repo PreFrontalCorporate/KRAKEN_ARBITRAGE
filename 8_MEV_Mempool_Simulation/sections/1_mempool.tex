@@ -1,0 +1,36 @@
+\section{The Mempool as a Dynamic Economic System}
+The mempool is the dynamic pre-consensus layer where pending transactions compete for block inclusion. Its economic properties are defined by the arrival of value (transactions) and the mechanisms for pricing block space (auctions).
+
+\subsection{Formalizing Transaction and Bundle Arrival}
+We model two primary sources of order flow: public user transactions and private searcher bundles.
+
+\subsubsection{Public Order Flow}
+The arrival of public transactions is modeled as a compound Poisson process. The number of transactions arriving in an interval $[0, t]$, denoted $N_p(t)$, follows a Poisson distribution with rate $\lambda_p$:
+$$P(N_p(t) = k) = \frac{(\lambda_p t)^k e^{-\lambda_p t}}{k!}$$
+The value of each transaction $j$, primarily its priority fee, $V_j$, is drawn from a log-normal distribution, $V_j \sim \text{Log-Normal}(\xi_1, \omega_1^2)$. The total public value signal at time $t$ is the sum of these values:
+$$P(t) = \sum_{j=1}^{N_p(t)} V_j$$
+
+\subsubsection{Private Order Flow (EOF)}
+Private bundles from searchers to builders are also modeled as a compound Poisson process, but with builder-specific access probabilities. For a builder $i$ among $n$ builders, the number of private bundles received, $N_{e,i}(t)$, follows a Poisson process with rate $\lambda_e \cdot \pi_i$, where $\lambda_e$ is the global bundle arrival rate and $\pi_i$ is builder $i$'s probability of receiving a given bundle.  The value of each bundle $j$, $O_j$, is drawn from a log-normal distribution, $O_j \sim \text{Log-Normal}(\xi_2, \omega_2^2)$. The private signal for builder $i$ is:
+$$E_i(t) = \sum_{j=1}^{N_{e,i}(t)} O_j$$
+
+\subsection{The EIP-1559 Fee Market: A Dual-Auction Model}
+EIP-1559 separates the cost of inclusion (base fee) from the cost of priority (priority fee).
+
+\subsubsection{Base Fee as a Dynamic Reserve Price}
+The base fee for block $t$, $p_t$, is a reserve price per gas unit. It updates based on the size of the previous block, $Q_{t-1}$, relative to a target size, $B$, using an adjustment parameter $\eta$:
+$$p_{t} = p_{t-1} \cdot e^{\eta(Q_{t-1} - B)/B}$$
+The base fee revenue is burned.
+
+\subsubsection{Priority Fee as a First-Price Auction}
+Transactions pay an additional priority fee (tip) directly to the builder for preferential ordering. This constitutes a first-price, pay-as-bid auction for block space priority, known as a Priority Gas Auction (PGA).
+
+\subsection{Block Builder Incentives and the MEV-Boost Auction}
+Builders construct blocks to maximize profit, which are then sold in the MEV-Boost auction.
+
+\subsubsection{The Builder's Knapsack Problem}
+A builder selects a subset of transactions $T_{\text{selected}}$ from the available set $T_{\text{available}}$ to maximize revenue, subject to the block gas limit $L_{\text{gas}}$:
+$$ \text{maximize} \sum_{tx \in T_{\text{selected}}} (\text{priority\_fee}(tx) + \text{MEV\_payment}(tx)) \quad \text{s.t.} \quad \sum_{tx \in T_{\text{selected}}} \text{gas\_used}(tx) \le L_{\text{gas}} $$
+
+\subsubsection{The MEV-Boost Auction Model}
+This is a first-price, sealed-bid auction. Builder $i$ constructs a block of total value $V_i$ and submits a bid $b_i \le V_i$. The proposer selects the highest bid, $b_{\text{winner}}$. The winning builder's profit is $\Pi_i = V_i - b_i$.

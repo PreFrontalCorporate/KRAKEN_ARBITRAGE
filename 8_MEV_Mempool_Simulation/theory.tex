@@ -1,0 +1,21 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage[a4paper, margin=1in]{geometry}
+
+\title{\textbf{A Framework for Simulating Adversarial Economics in Blockchain Mempools: Formal Models}}
+\author{Quantitative Research Division}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\abstract{This document provides the formal mathematical models underpinning a simulation environment for Maximal Extractable Value (MEV) and mempool dynamics. We formalize transaction arrival processes, the EIP-1559 fee market, block builder incentives, the profitability calculus for sandwich and liquidation attacks, and the game-theoretic interactions between competing adversarial agents.}
+
+\input{sections/1_mempool.tex}
+\input{sections/2_mev_strategies.tex}
+\input{sections/3_game_theory.tex}
+
+\end{document}

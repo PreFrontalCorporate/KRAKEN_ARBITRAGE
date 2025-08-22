@@ -1,0 +1,22 @@
+\section{The Calculus of Atomic MEV Strategies}
+
+\subsection{Sandwich Attacks on Constant Function Market Makers (CFMMs)}
+We derive the profitability bounds for a sandwich attack on a general CFMM. Let $\Delta$ be the victim trade size and $\eta$ be the slippage tolerance. The attacker's profit is $\text{PNL}(\Delta, \eta) = \Delta'_{\text{sand}} - \Delta_{\text{sand}}$.
+
+\subsubsection{Profitability Bounds}
+The profitability is determined by the CFMM's price impact, which can be bounded by linear functions with slopes $\mu$ (upper) and $\kappa$ (lower). The required front-run trade size, $\Delta_{\text{sand}}$, is bounded above by:
+$$\Delta_{\text{sand}} \le \left(\frac{\eta\mu}{\mu - \kappa} - 1\right)\Delta$$
+This shows that the attacker's capital cost is linear in the victim's slippage tolerance and inversely related to the pool's curvature $(\mu - \kappa)$.  The PNL is profitable if it exceeds the total gas costs of the front-run and back-run transactions. The minimum victim trade size for profitability is derived by setting the expected PNL equal to the transaction costs and solving for $\Delta$.
+
+
+\subsection{Back-running and Liquidations}
+A liquidation opportunity arises when a loan's Health Factor (HF) falls below 1.
+$$ \text{HF} = \frac{\sum_{i}(\text{Collateral}_i \times \text{Price}_i \times \text{Liquidation\_Threshold}_i)}{\sum_{j}(\text{Debt}_j \times \text{Price}_j)} < 1 $$
+
+\subsubsection{Profitability Model}
+A liquidator repays debt to seize collateral at a discount (liquidation bonus, $\lambda$). The net profit, $\Pi_{\text{liq}}$, is:
+$$ \Pi_{\text{liq}} = (\text{Value of Collateral Seized}) - (\text{Value of Debt Repaid}) - C_{\text{gas}} $$
+where Value of Collateral Seized includes the bonus. The opportunity is a back-run on the oracle price update that triggers the liquidatable state.
+
+\subsubsection{MEV-Builder Extract}
+In a competitive PGA for the liquidation, multiple liquidators will bid up their priority fee. The maximum rational bid is $\Pi_{\text{liq}}$. The MEV extracted by the builder is the winning priority fee, which will approach $\Pi_{\text{liq}}$ as competition increases. A liquidation is profitable for a liquidator only if $\Pi_{\text{liq}} > 0$ after accounting for the priority fee they expect to pay.

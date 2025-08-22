@@ -1,0 +1,22 @@
+\section{Game-Theoretic Models of MEV Competition}
+
+\subsection{The Priority Gas Auction (PGA)}
+We model the competition for an MEV opportunity of value $V$ as a first-price, all-pay auction among $N$ searchers.
+\begin{itemize}
+    \item \textbf{Players:} $N$ risk-neutral searcher bots.
+    \item \textbf{Prize:} An MEV opportunity of value $V$.
+    \item \textbf{Bids:} Each player $i$ submits a transaction with priority fee $b_i$.
+    \item \textbf{Payoffs:}
+        \begin{itemize}
+            \item Winner (highest bid $b_{\text{max}}$): $U_w = V - b_{\text{max}} - C_{\text{gas\_win}}$
+            \item Losers: $U_l = -C_{\text{gas\_fail}}$
+        \end{itemize}
+\end{itemize}
+
+\subsection{Equilibrium Bidding Strategies}
+In a simplified first-price auction setting (non-all-pay) where the value $V$ is common knowledge, the game resembles a Bertrand competition.
+\begin{itemize}
+    \item \textbf{Strategy:} Players will incrementally outbid each other.
+    \item \textbf{Equilibrium:} The winning bid $b_{\text{max}}$ will be driven up to $V - \epsilon$, where $\epsilon$ is the smallest possible profit margin a player is willing to accept. As the number of players $N \to \infty$, $b_{\text{max}} \to V$.
+    \item \textbf{Implication:} The searcher's profit margin approaches zero. The vast majority of the MEV opportunity's value ($V$) is captured by the block builder in the form of the winning priority fee.
+\end{itemize}

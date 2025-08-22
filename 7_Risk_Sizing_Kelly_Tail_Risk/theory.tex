@@ -1,0 +1,66 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+\begin{document}
+
+\title{Risk Sizing for Leveraged Crypto Arbitrage}
+\author{AI Quant Researcher}
+\date{\today}
+\maketitle
+
+\section{Introduction}
+This document details a risk sizing module for leveraged crypto arbitrage, incorporating Kelly optimization, model uncertainty, and drawdown constraints.
+
+\section{Theoretical Foundations}
+
+\subsection{Classical Kelly Criterion}
+The Kelly criterion maximizes long-term wealth growth by finding the optimal fraction $f^*$ of capital to bet. For repeated independent bets with win probability $p$, win payoff $b$, and loss $a$, the final wealth $W_N$ after $N$ trials is:
+$$W_N(f) = W_0 (1+fb)^W (1-fa)^L$$
+Maximizing the geometric growth rate is equivalent to maximizing the expected log-return:
+$$g(f) = E[\log(1+fR)] = p\log(1+fb) + (1-p)\log(1-fa)$$
+The optimal fraction $f^*$ is found by setting $\frac{dg}{df} = 0$:
+$$f^* = \frac{pb - (1-p)a}{ab}$$
+For $a=1$, $f^* = \frac{pb - (1-p)}{b}$.  For continuous returns with mean $\mu$ and variance $\sigma^2$, $f^* \approx \frac{\mu}{\sigma^2}$.
+
+\textbf{Assumptions and Failure Modes:}
+\begin{itemize}
+    \item \textbf{Known parameters:} $p$, $b$, and $a$ are assumed known, but are estimated in practice. Errors in these estimates, especially overestimating $p$ or $b$, can lead to significant overbetting and potential ruin.
+    \item \textbf{IID trials:}  Assumes independent and identically distributed returns, which is often violated in financial markets.
+    \item \textbf{Frictionless markets:} Ignores transaction costs and slippage.
+\end{itemize}
+
+\subsection{Drawdown-Constrained Kelly}
+To address drawdown risk, we constrain the probability of a drawdown below a threshold $\alpha$ to be less than $\beta$:
+$$ \begin{array}{ll}
+\underset{f}{\text{maximize}} & g(f) \\
+\text{subject to} & P(\inf_t W_t \le \alpha W_0) \le \beta
+\end{array} $$
+This can be approximated by a convex constraint:
+$$ E[(1+fR)^{-\lambda}] \le 1, \quad \lambda = \frac{\log(\beta)}{\log(\alpha)} $$
+For discrete scenarios $r_i$ with probabilities $\pi_i$:
+$$ \begin{array}{ll}
+\underset{f}{\text{maximize}} & \sum_i \pi_i \log(1+fr_i) \\
+\text{subject to} & \sum_i \pi_i (1+fr_i)^{-\lambda} \le 1
+\end{array} $$
+
+\subsection{Tail Risk Measures}
+\textbf{Value-at-Risk (VaR):}  $\text{VaR}_{\alpha}(L) = \inf\{l : P(L > l) \le 1-\alpha \}$.
+\textbf{Conditional Value-at-Risk (CVaR):} $\text{CVaR}_{\alpha}(L) = E[L | L > \text{VaR}_{\alpha}(L)]$.
+
+\textbf{Extreme Value Theory (EVT):} The Pickands-Balkema-de Haan theorem states that excesses over a high threshold $u$ follow a Generalized Pareto Distribution (GPD):
+$$G_{\xi, \sigma}(y) = 1 - (1 + \xi y/\sigma)^{-1/\xi}$$
+The Peaks-Over-Threshold (POT) method fits a GPD to excesses, estimating $\xi$ (tail index) and $\sigma$.
+
+\subsection{Robustification Techniques}
+\begin{itemize}
+    \item \textbf{Fractional Kelly:}  Bet a fraction $k$ of $f^*$.
+    \item \textbf{Shrinkage:} Improve parameter estimates.
+    \item \textbf{Distributionally Robust Optimization (DRO):} Optimize for the worst-case distribution within an ambiguity set.
+\end{itemize}
+
+\subsection{Ruin Probability}
+The probability of ruin is related to the strategy's edge and bet size.  Betting above $f^*$ increases ruin risk.
+
+\end{document}
