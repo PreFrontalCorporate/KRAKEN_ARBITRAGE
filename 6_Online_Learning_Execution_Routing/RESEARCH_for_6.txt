@@ -1,0 +1,459 @@
+Adaptive Online Algorithms for Optimal Order Routing under Non-StationarityPart I: Theoretical Foundations and Algorithmic FrameworksThis part establishes the complete theoretical underpinning for our approach. We begin by formalizing the problem in the language of online learning and then build up the algorithmic solutions, from the general principles of Online Convex Optimization to the specific challenges of non-stationary, adversarial, and contextual decision-making.Section 1: Formalization of the Online Order Routing ProblemThe practical challenge of dynamically routing child orders to minimize execution costs can be rigorously modeled within the framework of online learning. This translation into a mathematical structure is the foundation upon which robust, adaptive algorithms with performance guarantees can be built.1.1 The Sequential Decision GameThe problem is modeled as a repeated, sequential game between a learner (the routing algorithm) and an adversary (the market) over a time horizon of T steps.1 Each step t∈{1,…,T} corresponds to the routing decision for a single child order. At each step, the learner selects an action without full knowledge of the immediate outcome, after which the market reveals a corresponding loss. This adversarial framing is crucial as it makes no statistical assumptions about the market's behavior, allowing for worst-case performance guarantees.1.2 The Action Set AThe set of possible actions, A, is discrete and finite. An action at​∈A is a composite decision, representing a specific routing choice. We define it as a tuple:at​=(v,o)where v is the execution venue chosen from a set of available venues (e.g., NYSE, NASDAQ, IEX, Dark Pool A, Dark Pool B) and o is the order type (e.g., Market, Limit, Pegged).3 The total number of unique actions is the cardinality of this set, K=∣A∣. This composite definition captures the multi-faceted nature of the routing decision more accurately than a simple "expert selection" model.1.3 The Context Vector xt​Before making a decision at time t, the learner observes a context vector xt​∈X⊂Rd. This vector provides the critical side information that enables the algorithm to adapt its strategy to the current market state. The design of this feature vector is a crucial aspect of the system and should encapsulate predictive information about execution quality.5 Key components include:Real-time Market Data: Features derived from the limit order book, such as the bid-ask spread, the depth of liquidity at the first few price levels, recent price volatility, and estimated network latencies to each venue.Order-Specific Data: Characteristics of the order being executed, such as the parent order's total size, the quantity remaining to be executed, and any urgency parameters specified by the trading strategy.Historical Action Performance: Short-term moving averages of performance metrics for specific actions, such as recent fill rates or realized costs, which can serve as autoregressive features.1.4 The Loss Function ℓt​(at​,xt​)The loss function, ℓt​:A×X→R, quantifies the cost of taking action at​ given context xt​. A core assumption of the online learning framework is that this function is unknown to the learner prior to making the decision at​ and can be chosen by an adversary.2 For the problem of order execution, the loss is typically a measure of execution cost, such as:Implementation Shortfall: The difference between the average execution price and the arrival price (the market price at the moment the parent order was initiated).Slippage: The difference between the average execution price and the prevailing market price at the moment the child order is sent.Effective Spread Capture: For limit orders, this measures how much of the bid-ask spread was captured, potentially penalized by the opportunity cost if the order is not filled.For the application of Online Convex Optimization (OCO) algorithms, we conceptualize a family of convex loss functions ft​(⋅) defined over a continuous relaxation of the action space, as will be detailed in Section 2.1It is important to distinguish between minimizing execution cost and maximizing profit and loss (P&L). While this report focuses on execution cost, the canonical objective of a smart order router, the framework is general. If the loss were defined as negative P&L, the problem would shift from cost minimization to online portfolio optimization, likely requiring different context features that include alpha-generating signals.2 This highlights the framework's flexibility.1.5 The Objective: Regret MinimizationThe goal of an online algorithm is not to achieve the lowest possible loss on any single step, but to ensure that its cumulative loss over the entire horizon is close to that of a powerful benchmark policy chosen with the benefit of hindsight. This performance difference is termed regret, and an effective algorithm must guarantee that its regret grows sublinearly with T, implying that its average per-step performance converges to that of the benchmark.2We define several key notions of regret, which are progressively more suitable for non-stationary environments:Static Regret: This is the most basic benchmark, comparing the learner's cumulative loss to that of the single best fixed action in hindsight.RT​=t=1∑T​ℓt​(at​)−a∗∈Amin​t=1∑T​ℓt​(a∗)This benchmark is weak in non-stationary markets, as the single best action may change frequently.9Dynamic (or Non-stationary) Regret: This provides a much stronger benchmark by comparing the learner to a clairvoyant policy that is allowed to pick the optimal action at every time step.RTdyn​=t=1∑T​ℓt​(at​)−t=1∑T​at∗​∈Amin​ℓt​(at∗​)Minimizing this form of regret is significantly more challenging.12Switching Regret: This offers a practical and powerful intermediate benchmark. It compares the learner to the best policy that is allowed to change its chosen action at most S−1 times throughout the horizon.RTswitch​(S)=t=1∑T​ℓt​(at​)−π∈ΠS​min​t=1∑T​ℓt​(π(t))where ΠS​ is the set of all piecewise-constant policies with at most S segments. This measures performance against the best piecewise-stationary strategy, which is a highly relevant benchmark for markets characterized by distinct regimes.12Section 2: Routing via Online Convex Optimization (OCO)The Online Convex Optimization (OCO) framework provides a powerful and general set of tools for sequential decision-making. By relaxing the discrete action set to a continuous probability distribution, we can leverage gradient-based methods that are both computationally efficient and come with strong theoretical guarantees.2.1 The OCO Framework for RoutingThe learner's strategy at time t is represented by a probability distribution pt​ over the K actions. This distribution pt​ is a vector in the (K−1)-dimensional probability simplex, denoted ΔK​:ΔK​={p∈RK∣i=1∑K​pi​=1,pi​≥0 for all i}At each step, the learner first determines the distribution pt​ and then samples an action at​∼pt​. After the action is taken, the market reveals the loss vector ℓt​∈RK, where ℓt,i​ is the loss that would have been incurred by choosing action i. The learner's expected loss at this step is Eat​∼pt​​[ℓt​(at​)]=⟨pt​,ℓt​⟩.7 In practice, only the loss for the chosen action, ℓt,at​​, is observed (bandit feedback). An unbiased estimator for the full loss vector, ℓ^t​, must be constructed, typically via importance sampling:ℓ^t,i​={pt,i​ℓt,i​​0​if action i was chosenotherwise​2.2 Online Mirror Descent (OMD)Online Mirror Descent (OMD) is a generalization of the more familiar Online Gradient Descent (OGD) algorithm. OMD is particularly well-suited for problems where the decision space has a non-Euclidean geometry, such as the probability simplex.15The algorithm is defined by a mirror map (or distance-generating function) ψ(⋅), which must be a strongly convex and differentiable function. The mirror map induces a Bregman divergence Dψ​(p∥q), which serves as a generalized distance measure between two points p and q 14:Dψ​(p∥q)=ψ(p)−ψ(q)−⟨∇ψ(q),p−q⟩The OMD update rule can be understood as a two-step process:Gradient Step in the Dual Space: A standard gradient step is taken on the mirror-mapped representation of the current strategy.∇ψ(pt+1′​)=∇ψ(pt​)−ηt​ℓ^t​Projection back to the Primal Space: The result is mapped back to the original decision space (the simplex) by finding the point in ΔK​ that is closest to the intermediate point pt+1′​, as measured by the Bregman divergence.$$p_{t+1} = \arg\min_{p \in \Delta_K} D_\psi(p \| p'_{t+1})$$This can be written more compactly as:$$p_{t+1} = \arg\min_{p \in \Delta_K} \left\{ \langle p, \eta_t \hat{\ell}_t \rangle + D_\psi(p \| p_t) \right\}$$2.3 Special Case: Exponentiated Gradient (EG) / HedgeA particularly elegant and efficient instance of OMD arises when the mirror map is chosen to be the negative entropy function:ψ(p)=i=1∑K​pi​logpi​The corresponding Bregman divergence is the Kullback-Leibler (KL) divergence. With this choice, the OMD update rule simplifies to the Exponentiated Gradient (EG) algorithm, also known as the Hedge algorithm.14The update is performed on a set of unnormalized weights wt​∈R+K​. The update for each action i is multiplicative:$$w_{t+1, i} = w_{t, i} \exp(-\eta_t \hat{\ell}_{t, i})$$The probability distribution for the next step is then obtained by normalizing these weights:$$p_{t+1, i} = \frac{w_{t+1, i}}{\sum_{j=1}^K w_{t+1, j}}$$This normalization step is the projection onto the simplex. Unlike in many other OCO problems where the projection can be a computationally intensive subproblem 1, for EG this projection is a simple and efficient sum and division, making it highly practical for high-frequency applications.2.4 Regret Analysis and Step-Size SelectionThe performance of OMD is characterized by a worst-case regret bound. For a sequence of convex loss functions, the regret is bounded as 15:RT​≤ηDψ​(p∗∥p1​)​+2η​t=1∑T​∥ℓ^t​∥∗2​where p∗ is the best fixed strategy in hindsight, ∥⋅∥∗​ is the dual norm to the norm with respect to which ψ is strongly convex, and η is the learning rate (step-size).Step-Size Selection: The choice of η is critical for balancing the two terms in the regret bound.Fixed Horizon: If the time horizon T is known in advance, and assuming the dual norm of the loss gradients is bounded by G (i.e., ∥ℓ^t​∥∗​≤G), the optimal step-size is η=2Dψ​(p∗∥p1​)/(G2T)​. For EG, where Dψ​(p∗∥p1​)≤logK, this leads to the classic regret bound of RT​=O(GTlogK​).Unknown Horizon: In trading, T is almost never known. Two primary strategies exist to handle this:Doubling Trick: The algorithm is run in epochs of exponentially increasing length (1,2,4,8,…). Within each epoch k of length 2k, the learning rate is set as if the total horizon were 2k. This yields a regret bound of O(GTlogK​), which is optimal up to a constant factor.17Time-Varying Step-Size: A simpler and more common approach is to use a decaying step-size at each round, such as ηt​=c/t​ for some constant c. This also achieves the optimal O(TlogK​) regret bound and is often easier to implement.18A significant consideration for practical trading systems is the computational cost of satisfying complex constraints, such as risk limits or exchange-specific volume caps. The standard OCO framework requires projecting back onto the feasible set at every step, which can be a bottleneck.1 However, many trading constraints do not need to be satisfied on a per-order basis but rather on average over a longer period (e.g., a parent order's lifetime). The literature on OCO with "long-term constraints" shows that by relaxing the hard per-step constraints to soft, on-average constraints, one can achieve dramatic computational savings at the cost of a slightly worse theoretical regret bound (e.g., O(T3/4) instead of O(T​)).1 This insight allows for a co-design of the algorithm and the risk management system, trading a small amount of theoretical regret for a large gain in practical performance and system simplicity.Section 3: Contextual Bandits for State-Aware RoutingWhile OCO provides a robust, adversary-proof baseline, it does not inherently leverage the rich contextual information xt​ available at each decision point. Contextual bandit algorithms are designed specifically for this purpose, learning a policy that maps contexts to actions to minimize regret.3.1 The Contextual Bandit FrameworkThe problem is defined by the tuple (X,A,ℓ), where at each step t:The environment reveals a context xt​∈X.The learner chooses an action at​∈A based on a policy π(xt​).The learner observes the loss ℓt​(at​,xt​) for the chosen action only (partial feedback).The goal is to learn a policy π that minimizes the cumulative regret against an optimal policy.53.2 Exp4 for Adversarial ContextsFinancial markets are best modeled as adversarial, where no statistical assumptions can be made about the sequence of contexts and losses.27 The Exp4 algorithm is designed for this challenging setting.10Algorithm: Exp4 can be viewed as an application of the EG/Hedge algorithm in a "meta" setting. It operates over a set of M "expert" policies. At each step t, given context xt​:Each expert j∈{1,…,M} provides a probability distribution over actions, et,j​(xt​).The Exp4 algorithm maintains a weight distribution pt​ over the experts and forms a mixed strategy qt​=∑j=1M​pt,j​et,j​(xt​).An action at​ is sampled from qt​.The loss ℓt​(at​) is observed. An importance-weighted loss estimate ℓ^t,j​ is constructed for each expert.The weights on the experts are updated using the EG multiplicative update rule based on these loss estimates.Regret: The regret of Exp4 is bounded relative to the best expert in hindsight, typically scaling as O(KTlogM​).11 The primary drawback is its computational complexity. If the expert class is large (e.g., all linear classifiers), M can be infinite, making the algorithm impractical without further assumptions or approximations.3.3 Thompson Sampling for Bayesian ExplorationThompson Sampling (TS) provides a Bayesian and often empirically superior approach to balancing exploration and exploitation.32 It operates by maintaining a posterior distribution over a model of the environment and acting optimally according to a sample from that posterior.Algorithm: For a contextual setting, we assume a model for the expected reward (or negative loss) of each action a given context xt​. A common and practical choice is a linear model: E[rt​(a)∣xt​]=xtT​βa​, where βa​∈Rd is a vector of unknown coefficients for each arm. The TS algorithm proceeds as follows:Maintain Posteriors: For each arm a, maintain a posterior distribution over its coefficient vector, P(βa​∣History). Assuming Gaussian noise, if we place a Gaussian prior on βa​, the posterior will also be Gaussian.Sample from Posteriors: At each step t, draw a sample coefficient vector for each arm from its current posterior: β~​t,a​∼P(βa​∣Historyt−1​).Act Optimally: Given the current context xt​, choose the action that has the highest predicted reward based on the sampled parameters: at​=argmaxa​xtT​β~​t,a​.Update Posterior: Observe the reward rt​ for the chosen action at​. Update the posterior distribution for arm at​ using Bayes' rule: P(βat​​∣Historyt​)∝P(rt​∣xt​,βat​​)P(βat​​∣Historyt−1​). For the linear-Gaussian case, this update can be computed efficiently via Bayesian linear regression.3.4 Adapting to Non-StationarityStandard bandit algorithms are designed for stationary environments. When the underlying reward distributions change, they can fail to adapt because their posterior beliefs become overly confident, causing them to cease exploration and lock onto a suboptimal action.9 Several techniques have been developed to address this critical issue:Discounted Updates: This approach gives more weight to recent observations by applying a discount factor γ∈(0,1) to past data. In the context of TS, this can be implemented by using a discounted form of Bayesian linear regression when updating the posteriors.32Sliding Windows: A related and effective method is to base the posterior updates only on the observations from the most recent τ time steps. This "forgetting" mechanism allows the algorithm to adapt to abrupt changes by discarding stale data from previous regimes.32Active Change-Point Detection and Resets: A more sophisticated approach involves running a separate statistical process to detect changes in the data stream. A change-point detection algorithm monitors the sequence of observed rewards or, more powerfully, the prediction errors (residuals) of the bandit's model. When a statistically significant change is detected, it triggers an adaptation mechanism in the main algorithm, such as resetting the posterior distributions in TS to their uninformative priors, or resetting the weights in Exp4 to be uniform. This forces the algorithm to re-explore and learn the new environmental dynamics.9The regret bounds for these non-stationary algorithms depend on a measure of the environment's instability, such as the number of change-points S or the total variation Δ of the reward distributions. Typical bounds scale as O(ST​) or O(Δ1/3T2/3).9A subtle but critical failure mode of standard Thompson Sampling in non-stationary settings arises from its exploration strategy.34 TS explores to reduce uncertainty about arm rewards, but it treats all uncertainty equally. It does not distinguish between an arm whose reward is uncertain but stable, and an arm whose reward is uncertain and highly volatile. The information gained from exploring the volatile arm is less valuable because it has a shorter "shelf life" and will quickly become obsolete. This suggests that a truly advanced adaptive algorithm should not just react to non-stationarity but attempt to model it. For instance, the Bayesian model in TS could be extended to include parameters for the rate of change of each arm's reward distribution. This would lead to a more intelligent exploration strategy that prioritizes gathering information that is expected to remain valuable for longer, a frontier research direction with significant practical implications for trading.Section 4: Analysis in Adversarial EnvironmentsThis section formalizes the notion of an adversarial market, where outcomes are not stochastic draws from a fixed distribution but can be chosen by an opponent to exploit the learner's strategy. We analyze our algorithms through the lens of worst-case performance guarantees.4.1 The Adversarial ModelWe consider two primary types of adversaries:Oblivious Adversary: This adversary must choose the entire sequence of loss functions ℓ1​,…,ℓT​ before the game begins. It knows the learner's algorithm but not the specific random choices the learner will make.27Adaptive Adversary: This is a more powerful and realistic model for financial markets. The adaptive adversary can choose the loss function ℓt​ at each step based on the learner's past actions and probability distributions, p1​,…,pt−1​. This models the reactive nature of market participants who may adjust their strategies in response to our order flow.4.2 Minimax RegretIn an adversarial setting, the goal is to design an algorithm that minimizes its maximum possible regret, where the maximum is taken over all possible sequences of losses the adversary could choose. This is the minimax regret.40 For the general K-armed bandit problem, the minimax regret is known to be Ω(KT​), meaning no algorithm can guarantee a better worst-case performance than this rate.42 Algorithms like Exp3 are minimax optimal because their upper bounds match this lower bound up to logarithmic factors.4.3 Feedback Graphs as a Realistic Model for RoutingThe standard bandit feedback model (observing only the loss of the chosen action) is often too pessimistic for order routing. Conversely, the full-information "experts" model (observing the losses of all actions) is too optimistic. When an order is routed to venue A, we do not get a fill from venue B, but we do observe public market data from venue B (e.g., its limit order book, recent trades), which provides strong information about the likely outcome had we routed there.This intermediate information structure is perfectly captured by the concept of a feedback graph.42 In this model, the actions are nodes in a graph, and after choosing an action, the learner observes the losses of the chosen action and all of its neighbors in the graph. The regret guarantees for learning with feedback graphs depend on the graph's independence number, α, which is the size of the largest set of nodes with no edges between them. The regret bounds gracefully interpolate between the experts setting (α=1, corresponding to a complete graph, with regret O(TlogK​)) and the bandit setting (α=K, corresponding to an empty graph, with regret O(KT​)). This provides a more nuanced and realistic theoretical model for the order routing problem.4.4 Integrating Change-Point Detection with Adversarial PlayA sophisticated adversary might try to manipulate the learner by generating loss sequences that mimic a distribution shift, tricking a change-point detector into triggering an unnecessary reset. This would cause the learner to discard valuable learned information, thereby increasing its regret.To counter this, the change-point detection mechanism itself must be robust. A powerful approach is to build the detector using the principles of online learning. As shown in the literature, Online Mirror Descent can be used to construct the non-anticipating estimators at the core of a sequential change-point detection test.45 By using an algorithm like OMD, which has logarithmic regret guarantees for this estimation task, the detector becomes more resilient to adversarial manipulation. This creates a tightly coupled system where both the primary routing algorithm (e.g., Exp4) and its adaptation mechanism (the change-point detector) are designed to be robust in worst-case, adversarial environments.Table 1: Comparison of Adaptive Routing AlgorithmsFeatureExponentiated Gradient (OCO)Exp4 (Adversarial Contextual Bandit)Sliding-Window Thompson Sampling (Bayesian Contextual Bandit)Algorithm TypeOnline Convex OptimizationAdversarial Bandit with Expert AdviceBayesian Contextual BanditCore UpdateMultiplicative weight update based on negative entropy mirror mapImportance-weighted multiplicative updates over a set of expertsBayesian posterior update on reward model parameters (e.g., for a linear model)Regret (Stationary)O(TlogK​)O(KTlogM​) (M=experts)O~(dT​) (for linear model with dimension d)Regret (Non-Stationary)No inherent mechanism; requires external resetO(STKlogM​) (S=switches)O~(S1/2T1/2) or O~(T2/3) depending on window size and change typeKey AssumptionsConvex loss functions; full loss vector feedback (or unbiased est.)Losses are adversarial; context can be adversarialRewards are stochastic draws from a model class; requires correct model specificationAdaptabilityImplicit via gradient steps; can be reset externallyImplicit via weight shifts; can be combined with resets (Exp4.S)Explicit forgetting via sliding window or discounting factor γComputational CostVery low, O(K) per stepHigh, O(M⋅K) per step if experts are explicitModerate, depends on posterior update (e.g., O(d2) for linear-Gaussian model)Code snippet\documentclass{article}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+
+\title{Adaptive Online Algorithms for Optimal Order Routing under Non-Stationarity: A Formal Treatment}
+\author{Quantitative Research Division}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\abstract{
+This document provides a formal mathematical treatment of adaptive online algorithms for the optimal selection of execution venue, order type, and routing strategy in non-stationary financial markets. We formalize the problem within the frameworks of Online Convex Optimization and Contextual Bandits, providing regret guarantees and analyzing algorithm behavior under adversarial conditions. We present Mirror Descent and its specialization, Exponentiated Gradient, deriving their update equations and regret bounds. We then extend this to contextual bandits, including Exp4 for adversarial settings and Thompson Sampling for Bayesian exploration, with specific adaptations for non-stationary environments such as sliding windows and change-point resets. The analysis concludes with a discussion of minimax regret in adversarial settings.
+}
+
+\section{Formalization of the Online Order Routing Problem}
+We model the problem as a sequential game over a time horizon $t=1, \dots, T$.
+
+\subsection{Action Set and Context Vector}
+The action set $\mathcal{A}$ is a finite set of $K$ composite actions. Each action $a \in \mathcal{A}$ is a tuple $a = (v, o)$, where $v$ is the venue and $o$ is the order type. At each time step $t$, the learner observes a context vector $x_t \in \mathcal{X} \subset \mathbb{R}^d$, containing market and order-specific features such as latency, spread, and depth.
+
+\subsection{Loss Function and Regret}
+The learner chooses an action $a_t \in \mathcal{A}$ and incurs a loss $\ell_t(a_t, x_t)$, representing execution cost (e.g., implementation shortfall). The sequence of loss functions $\{\ell_t\}_{t=1}^T$ can be chosen by an adversary. The objective is to minimize regret, defined as the difference between the learner's cumulative loss and that of a benchmark policy. For a non-stationary environment with $S$ change-points, the switching regret is a key metric:
+\begin{equation}
+    R_T^{\text{switch}}(S) = \sum_{t=1}^T \ell_t(a_t) - \min_{\pi \in \Pi_S} \sum_{t=1}^T \ell_t(\pi(t))
+\end{equation}
+where $\Pi_S$ is the set of policies with at most $S-1$ switches.
+
+\section{Mirror Descent and Exponentiated Gradient}
+In the Online Convex Optimization (OCO) setting, the learner's strategy is a probability distribution $p_t \in \Delta_K$ over the $K$ actions.
+
+\subsection{The Online Mirror Descent (OMD) Update}
+OMD generalizes Online Gradient Descent. Given a mirror map $\psi(\cdot)$ that is 1-strongly convex w.r.t. a norm $\|\cdot\|$, the update is:
+\begin{equation}
+    p_{t+1} = \arg\min_{p \in \Delta_K} \left\{ \eta_t \langle p, \hat{\ell}_t \rangle + D_\psi(p \| p_t) \right\}
+\end{equation}
+where $\eta_t$ is the learning rate, $\hat{\ell}_t$ is an unbiased estimate of the loss vector, and $D_\psi(p \| q) = \psi(p) - \psi(q) - \langle \nabla\psi(q), p - q \rangle$ is the Bregman divergence.
+
+\subsection{Exponentiated Gradient (EG)}
+Choosing the negative entropy $\psi(p) = \sum_{i=1}^K p_i \log p_i$ as the mirror map yields the EG algorithm. The update rule for the unnormalized weights $w_{t,i}$ is:
+\begin{equation}
+    w_{t+1, i} = w_{t, i} \exp(-\eta_t \hat{\ell}_{t, i})
+\end{equation}
+The new probability distribution is $p_{t+1, i} = w_{t+1, i} / \sum_{j=1}^K w_{t+1, j}$. This normalization is the projection onto the simplex $\Delta_K$.
+
+\subsection{Regret Bounds and Step-Size Selection}
+The regret of OMD is bounded by:
+\begin{equation}
+    R_T \le \frac{D_\psi(p^* \| p_1)}{\eta} + \frac{\eta}{2} \sum_{t=1}^T \|\hat{\ell}_t\|_*^2
+\end{equation}
+where $\|\cdot\|_*$ is the dual norm. With a time-varying step-size $\eta_t = c/\sqrt{t}$ and assuming $\|\hat{\ell}_t\|_\infty \le G$, the regret for EG is bounded by $R_T \le O(G\sqrt{T \log K})$. This bound is sublinear in $T$, ensuring the average regret approaches zero.
+
+\section{Contextual Bandits in Non-Stationary Environments}
+Contextual bandits explicitly learn a policy $\pi: \mathcal{X} \to \mathcal{A}$.
+
+\subsection{Thompson Sampling (TS) for Non-Stationarity}
+TS is a Bayesian algorithm. Assume a linear model for the expected reward of action $a$: $\mathbb{E}[r_t(a) | x_t] = x_t^T \beta_a$.
+\begin{enumerate}
+    \item Maintain a posterior over $\beta_a$, e.g., $\beta_a \sim \mathcal{N}(\mu_a, \Sigma_a)$.
+    \item At time $t$, sample $\tilde{\beta}_{t,a} \sim \mathcal{N}(\mu_{t-1,a}, \Sigma_{t-1,a})$ for each arm $a$.
+    \item Choose action $a_t = \arg\max_a x_t^T \tilde{\beta}_{t,a}$.
+    \item Observe reward $r_t$ and update the posterior for arm $a_t$ using Bayesian linear regression.
+\end{enumerate}
+For non-stationary environments, a **sliding-window** variant is used, where the posterior update at time $t$ only considers observations from $\{t-\tau+1, \dots, t\}$ for a window size $\tau$. The regret bound for such an algorithm in an environment with $S$ abrupt changes is typically of the order $\tilde{O}(\sqrt{ST})$.
+
+\subsection{Exp4 for Adversarial Contexts}
+Exp4 is designed for adversarial settings. It maintains a distribution over a set of $M$ expert policies. Its regret is bounded by $O(\sqrt{KT \log M})$ against the best expert. To handle non-stationarity, Exp4 can be combined with a reset mechanism. A **windowed-reset** variant would involve running a change-point detector over a recent window of prediction errors. If a change is detected, the weights over the experts are reset to uniform, forcing re-exploration.
+
+\section{Adversarial Settings and Change-Point Resets}
+\subsection{Minimax Regret}
+In an adversarial setting, the goal is to find an algorithm with the best possible worst-case guarantee. The minimax regret for the $K$-armed bandit problem is $\Omega(\sqrt{KT})$. Algorithms like Exp4 are designed to be minimax optimal.
+
+\subsection{Change-Point Detection for Resets}
+To adapt to abrupt changes, an online change-point detection mechanism can be used to trigger a reset of the learning algorithm. A common approach is to monitor a statistic based on the sequential likelihood ratio. Let $\theta_0$ be the pre-change parameter distribution and $\theta_1$ be the post-change distribution. A detector tracks a statistic like the CUSUM statistic:
+\begin{equation}
+    S_t = \max(0, S_{t-1} + \log \frac{f_{\theta_1}(y_t)}{f_{\theta_0}(y_t)})
+\end{equation}
+where $y_t$ is the observed reward or model residual at time $t$. A change is flagged if $S_t$ exceeds a threshold. When a change is detected, the bandit algorithm's state (e.g., weights in EG, posteriors in TS) is reset to an initial state, allowing it to adapt to the new regime. The regret bound then depends on the number of resets (change-points) $S$, e.g., $R_T = O(\sqrt{ST})$.
+
+\end{document}
+Part II: Implementation and Empirical ValidationThis part provides a complete, Colab-ready Python implementation of the theoretical concepts. The code is structured into modular components, including a non-stationary market environment, implementations of the routing algorithms, and a suite of unit tests to ensure correctness and validate theoretical properties.Pythonimport numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import unittest
+from abc import ABC, abstractmethod
+from scipy.stats import invgamma, multivariate_normal
+
+# --- Section 5.1: Interfaces ---
+
+class CostModel(ABC):
+    """Abstract base class for a cost model."""
+    @abstractmethod
+    def calculate_cost(self, execution_report: dict) -> float:
+        pass
+
+class ExecutionEngine(ABC):
+    """Abstract base class for an execution engine."""
+    @abstractmethod
+    def execute(self, action: int, context: np.ndarray) -> dict:
+        pass
+
+# --- Section 5.2: MarketEnvironment ---
+
+class MarketEnvironment(ExecutionEngine):
+    """
+    Simulates a non-stationary market environment for order routing.
+    This class acts as both the environment and the execution engine for simplicity.
+    """
+    def __init__(self, n_actions: int, n_features: int, drift_mode: str = 'abrupt',
+                 change_prob: float = 0.001, drift_std: float = 0.1):
+        """
+        Initializes the market environment.
+        Args:
+            n_actions (int): Number of possible routing actions (K).
+            n_features (int): Dimensionality of the context vector (d).
+            drift_mode (str): 'abrupt' for sudden changes, 'gradual' for slow drift.
+            change_prob (float): Probability of an abrupt change at any step.
+            drift_std (float): Standard deviation for the random walk in gradual drift.
+        """
+        self.n_actions = n_actions
+        self.n_features = n_features
+        self.drift_mode = drift_mode
+        self.change_prob = change_prob
+        self.drift_std = drift_std
+        
+        # True underlying cost model parameters (hidden from the agent)
+        self.true_coeffs = np.random.randn(n_actions, n_features)
+        self.noise_std = 0.1
+
+    def _update_true_costs(self):
+        """Updates the true cost model to simulate non-stationarity."""
+        if self.drift_mode == 'abrupt':
+            if np.random.rand() < self.change_prob:
+                # A random action becomes significantly better
+                best_action = np.random.randint(self.n_actions)
+                self.true_coeffs = np.random.randn(self.n_actions, self.n_features) * 0.5
+                self.true_coeffs[best_action] *= -2 # Make rewards higher (costs lower)
+        elif self.drift_mode == 'gradual':
+            self.true_coeffs += np.random.randn(self.n_actions, self.n_features) * self.drift_std
+
+    def get_context(self) -> np.ndarray:
+        """Generates a new context vector."""
+        return np.random.randn(self.n_features)
+
+    def execute(self, action: int, context: np.ndarray) -> dict:
+        """
+        Executes an action and returns an execution report (cost).
+        This method also advances the environment's state.
+        """
+        self._update_true_costs()
+        
+        # Calculate true costs for all actions given the context
+        true_costs = self.true_coeffs @ context
+        
+        # Observed cost for the chosen action has some noise
+        observed_cost = true_costs[action] + np.random.randn() * self.noise_std
+        
+        execution_report = {
+            'action': action,
+            'cost': observed_cost,
+            'all_true_costs': true_costs # For regret calculation
+        }
+        return execution_report
+
+# --- Section 5.3: MirrorDescentRouter (Exponentiated Gradient) ---
+
+class MirrorDescentRouter:
+    """
+    Implements an Exponentiated Gradient router for online decision making.
+    This is a special case of Mirror Descent with the negative entropy regularizer.
+    """
+    def __init__(self, n_actions: int, c: float = 1.0):
+        self.n_actions = n_actions
+        self.c = c  # Constant for time-varying learning rate
+        self.weights = np.ones(n_actions)
+        self.t = 0
+
+    def choose_action_probs(self, context: np.ndarray = None) -> np.ndarray:
+        """Returns the probability distribution over actions."""
+        return self.weights / np.sum(self.weights)
+
+    def update(self, chosen_action: int, loss: float, probs: np.ndarray):
+        """Updates weights using the Exponentiated Gradient rule."""
+        self.t += 1
+        eta_t = self.c / np.sqrt(self.t)
+        
+        # Importance-weighted loss estimate
+        estimated_loss = loss / probs[chosen_action]
+        
+        # Multiplicative update
+        self.weights[chosen_action] *= np.exp(-eta_t * estimated_loss)
+        
+        # Numerical stability: prevent weights from becoming too small or large
+        if np.sum(self.weights) < 1e-9:
+            self.weights = np.ones(self.n_actions)
+
+# --- Section 5.4: ContextualBanditRouter (Sliding-Window Thompson Sampling) ---
+
+class ThompsonSamplingRouter:
+    """
+    Implements a Sliding-Window Thompson Sampling router with a linear reward model.
+    Assumes rewards are negative costs.
+    """
+    def __init__(self, n_actions: int, n_features: int, window_size: int = 100, alpha: float = 1.0):
+        self.n_actions = n_actions
+        self.n_features = n_features
+        self.window_size = window_size
+        self.alpha = alpha  # Controls prior variance
+
+        # Store recent history for each arm
+        self.history = {a: {'X':, 'y':} for a in range(n_actions)}
+
+        # Posterior parameters for each arm's coefficients beta_a
+        # Prior: beta_a ~ N(0, alpha^-1 * I)
+        self.B = {a: np.eye(n_features) * self.alpha for a in range(n_actions)}
+        self.mu = {a: np.zeros(n_features) for a in range(n_actions)}
+        self.f = {a: np.zeros(n_features) for a in range(n_actions)}
+
+    def choose_action(self, context: np.ndarray) -> int:
+        """Choose an action by sampling from the posterior and maximizing."""
+        sampled_coeffs = np.array([
+            np.random.multivariate_normal(self.mu[a], np.linalg.inv(self.B[a]))
+            for a in range(self.n_actions)
+        ])
+        
+        expected_rewards = sampled_coeffs @ context
+        return np.argmax(expected_rewards)
+
+    def update(self, chosen_action: int, context: np.ndarray, cost: float):
+        """Update the posterior for the chosen action using data in the sliding window."""
+        reward = -cost
+        
+        # Add new observation to history and maintain window size
+        self.history[chosen_action]['X'].append(context)
+        self.history[chosen_action]['y'].append(reward)
+        if len(self.history[chosen_action]['X']) > self.window_size:
+            self.history[chosen_action]['X'].pop(0)
+            self.history[chosen_action]['y'].pop(0)
+
+        # Re-calculate posterior from scratch using only data in the window
+        X_hist = np.array(self.history[chosen_action]['X'])
+        y_hist = np.array(self.history[chosen_action]['y'])
+        
+        if len(X_hist) > 0:
+            self.B[chosen_action] = self.alpha * np.eye(self.n_features) + X_hist.T @ X_hist
+            self.f[chosen_action] = X_hist.T @ y_hist
+            self.mu[chosen_action] = np.linalg.solve(self.B[chosen_action], self.f[chosen_action])
+
+# --- Section 6: Experimental Analysis and Simulation ---
+
+def run_simulation(env, router, T):
+    """Runs a simulation for T steps and returns cumulative regret and action history."""
+    cumulative_regret = 0
+    regret_history =
+    action_history =
+    optimal_action_probs = # For MD router
+
+    for t in range(T):
+        context = env.get_context()
+        
+        if isinstance(router, MirrorDescentRouter):
+            probs = router.choose_action_probs(context)
+            action = np.random.choice(env.n_actions, p=probs)
+            optimal_action_probs.append(probs)
+        else: # ThompsonSamplingRouter
+            action = router.choose_action(context)
+            
+        report = env.execute(action, context)
+        cost = report['cost']
+        
+        # Calculate instantaneous regret
+        optimal_cost = np.min(report['all_true_costs'])
+        inst_regret = cost - optimal_cost
+        cumulative_regret += inst_regret
+        
+        regret_history.append(cumulative_regret)
+        action_history.append(action)
+        
+        # Update router
+        if isinstance(router, MirrorDescentRouter):
+            router.update(action, cost, probs)
+        else:
+            router.update(action, context, cost)
+            
+    return regret_history, action_history, optimal_action_probs
+
+def plot_results(regret_histories, labels):
+    """Plots cumulative regret for different algorithms."""
+    plt.figure(figsize=(12, 8))
+    for regret_history, label in zip(regret_histories, labels):
+        plt.plot(regret_history, label=label)
+    plt.title('Cumulative Regret Over Time')
+    plt.xlabel('Time Step (t)')
+    plt.ylabel('Cumulative Regret')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+def plot_action_probabilities(probs_history, env, change_point):
+    """Plots the evolution of action probabilities for the MD router."""
+    probs_df = pd.DataFrame(probs_history, columns=[f'Action {i}' for i in range(env.n_actions)])
+    plt.figure(figsize=(12, 8))
+    probs_df.plot(ax=plt.gca())
+    plt.axvline(x=change_point, color='r', linestyle='--', label='Regime Change')
+    plt.title('Action Probabilities (Mirror Descent) vs. Time')
+    plt.xlabel('Time Step (t)')
+    plt.ylabel('Probability')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+# --- Main execution block for simulation ---
+if __name__ == '__main__':
+    # --- 6.1 Simulation Setup ---
+    T = 10000
+    N_ACTIONS = 5
+    N_FEATURES = 10
+    
+    # --- 6.2 Performance Metric: Cumulative Regret Plot ---
+    print("Running simulation for cumulative regret...")
+    env_gradual = MarketEnvironment(N_ACTIONS, N_FEATURES, drift_mode='gradual')
+    md_router = MirrorDescentRouter(N_ACTIONS)
+    ts_router = ThompsonSamplingRouter(N_ACTIONS, N_FEATURES, window_size=200)
+
+    # Need to run simulation on the same environment instance for fair comparison
+    # To do this properly, we'd need to reset env and routers for each run.
+    # For simplicity, we create separate but identically configured environments.
+    env1 = MarketEnvironment(N_ACTIONS, N_FEATURES, drift_mode='gradual')
+    env2 = MarketEnvironment(N_ACTIONS, N_FEATURES, drift_mode='gradual')
+    
+    regret_md, _, _ = run_simulation(env1, MirrorDescentRouter(N_ACTIONS), T)
+    regret_ts, _, _ = run_simulation(env2, ThompsonSamplingRouter(N_ACTIONS, N_FEATURES, window_size=200), T)
+    
+    plot_results([regret_md, regret_ts],)
+
+    # --- 6.3 Demonstrating Adaptability ---
+    print("\nRunning simulation to demonstrate adaptability...")
+    CHANGE_POINT = T // 2
+    # Create an environment that has a single, predictable change
+    class AbruptChangeEnv(MarketEnvironment):
+        def _update_true_costs(self):
+            if not hasattr(self, 't'): self.t = 0
+            self.t += 1
+            if self.t == CHANGE_POINT:
+                print(f"*** Regime change triggered at t={self.t} ***")
+                self.true_coeffs = np.random.randn(self.n_actions, self.n_features) * 0.5
+                self.true_coeffs *= -5 # Make action 0 the new best
+    
+    env_abrupt = AbruptChangeEnv(N_ACTIONS, N_FEATURES)
+    # Make action N_ACTIONS-1 best initially
+    env_abrupt.true_coeffs = np.random.randn(N_ACTIONS, N_FEATURES) * 0.5
+    env_abrupt.true_coeffs[-1] *= -5
+    
+    md_router_adapt = MirrorDescentRouter(N_ACTIONS)
+    _, _, probs_hist = run_simulation(env_abrupt, md_router_adapt, T)
+    
+    plot_action_probabilities(probs_hist, env_abrupt, CHANGE_POINT)
+
+# --- Section 5.5: Unit Testing ---
+
+class TestOnlineAlgorithms(unittest.TestCase):
+
+    def test_simplex_projection(self):
+        """Test that MirrorDescentRouter always outputs a valid probability distribution."""
+        router = MirrorDescentRouter(n_actions=5)
+        for _ in range(100):
+            router.update(chosen_action=0, loss=np.random.rand(), probs=np.full(5, 0.2))
+            probs = router.choose_action_probs()
+            self.assertAlmostEqual(np.sum(probs), 1.0, places=6)
+            self.assertTrue(np.all(probs >= 0))
+
+    def test_weight_update(self):
+        """Test that the weight for a consistently low-loss arm grows."""
+        router = MirrorDescentRouter(n_actions=3)
+        initial_probs = router.choose_action_probs()
+        # Arm 0 always has low loss, others have high loss
+        for _ in range(20):
+            # We must pass the actual probabilities used for the choice to update
+            current_probs = router.choose_action_probs()
+            router.update(chosen_action=0, loss=0.1, probs=current_probs)
+            router.update(chosen_action=1, loss=0.9, probs=current_probs)
+            router.update(chosen_action=2, loss=0.9, probs=current_probs)
+        
+        final_probs = router.choose_action_probs()
+        self.assertGreater(final_probs, initial_probs)
+        self.assertLess(final_probs, initial_probs)
+
+    def test_regret_scaling(self):
+        """Test that cumulative regret scales sublinearly, roughly as O(sqrt(T))."""
+        # Use a fixed adversarial environment for reproducibility
+        class FixedAdversary(MarketEnvironment):
+            def __init__(self, n_actions, n_features):
+                super().__init__(n_actions, n_features)
+                self.costs_sequence = [np.random.uniform(0, 1, n_actions) for _ in range(400)]
+                self.t = 0
+            def execute(self, action, context):
+                true_costs = self.costs_sequence[self.t % len(self.costs_sequence)]
+                self.t += 1
+                return {'cost': true_costs[action], 'all_true_costs': true_costs}
+            def get_context(self): return None # Context not needed for this test
+
+        env = FixedAdversary(3, 1)
+        regret_T, _, _ = run_simulation(env, MirrorDescentRouter(3), T=100)
+        
+        env.t = 0 # Reset environment
+        regret_4T, _, _ = run_simulation(env, MirrorDescentRouter(3), T=400)
+        
+        final_regret_T = regret_T[-1]
+        final_regret_4T = regret_4T[-1]
+        
+        # Expect regret at 4T to be roughly 2x regret at T, not 4x.
+        # We allow a generous margin for stochasticity.
+        ratio = final_regret_4T / final_regret_T if final_regret_T > 0 else 0
+        self.assertLess(ratio, 3.0, "Regret should scale sublinearly, O(sqrt(T))")
+        self.assertGreater(ratio, 1.5, "Regret should still be growing")
+
+    def test_adaptation_to_shock(self):
+        """Test if the TS router adapts after an abrupt environmental shock."""
+        class ShockEnv(MarketEnvironment):
+            def __init__(self, n_actions, n_features, shock_time):
+                super().__init__(n_actions, n_features)
+                self.shock_time = shock_time
+                self.t = 0
+                # Arm 0 is best before shock
+                self.true_coeffs = -10
+                self.true_coeffs = 10
+            def _update_true_costs(self):
+                self.t += 1
+                if self.t == self.shock_time:
+                    # Arm 1 becomes best after shock
+                    self.true_coeffs, self.true_coeffs = \
+                        self.true_coeffs, self.true_coeffs
+        
+        T = 400
+        SHOCK_TIME = 200
+        env = ShockEnv(2, 1, SHOCK_TIME)
+        router = ThompsonSamplingRouter(2, 1, window_size=50)
+        
+        _, actions, _ = run_simulation(env, router, T)
+        
+        # Phase 1: Before shock, should mostly choose arm 0
+        actions_phase1 = actions
+        self.assertGreater(actions_phase1.count(0), actions_phase1.count(1) * 2)
+
+        # Phase 2: After shock, should learn to choose arm 1
+        actions_phase2 = actions
+        # Check adaptation in the second half of phase 2
+        actions_phase2_late = actions
+        self.assertGreater(actions_phase2_late.count(1), actions_phase2_late.count(0) * 2)
+
+if __name__ == '__main__':
+    # This block will now run the unit tests after the simulation
+    print("\nRunning unit tests...")
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(TestOnlineAlgorithms))
+    runner = unittest.TextTestRunner()
+    runner.run(suite)
+

@@ -1,0 +1,15 @@
+We need a rigorous MEV/mempool simulation and adversarial economics lab to prototype sandwiching, frontrunning, and bundle execution mechanics (no real mempool use yet). Produce:
+
+A) LaTeX block that:
+   - Formalize mempool model: arrival of user transactions, private and public bundles, gas auctions, and priority fee auctions. Provide basic auction-theory model for block-builder incentives.
+   - Analyze sandwich profitability bounds: for a given CFMM, derive the minimum victim trade size and maximum acceptable front-run trade to remain profitable after fees and gas.
+   - Present back-running/liquidation model and characterize when a liquidation is profitable net of MEV-builder extract.
+   - Provide adversarial game-theoretic model: multiple bots bidding for priority; derive equilibrium bidding strategies in simplified settings.
+
+B) Colab-ready Python block that:
+   - Implements a mempool simulator: synthetic user trades arrive, bots observe them with a small latency, bots can place pre/post transaction bundles with gas bid; block inclusion simulated with a simple auction (highest gas first).
+   - Implements a sandwich-bot detector and simulator that computes theoretical bounds and executes sandwiches when profitable.
+   - Runs experiments showing how marginal gas price and front-run competition erode sandwich profitability; unit tests show profitability disappears with enough competing bots or high base gas price.
+   - Interfaces: CFMM stepper from CFMM thread and CostModel gas cost plugged in.
+
+Make deterministic seeds and provide comments where to add real mempool traces for replay later.

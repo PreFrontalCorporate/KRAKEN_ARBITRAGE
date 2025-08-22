@@ -1,0 +1,14 @@
+We are building a research-grade Limit Order Book (LOB) microstructure theory & simulator for CEX execution (Kraken-first). Produce:
+
+A) A rigorous LaTeX write-up that includes:
+   - Formal definitions: order, limit order, market order, tick, queue position, liquidity, mid-price, microstructure noise.
+   - Mathematical model for order arrivals (Poisson/Hawkes), cancellations, and price impact. Provide equations and reference key theorems (e.g., Hawkes process stationarity conditions).
+   - Optimal execution problem statement (Almgren–Chriss): cost functional, market impact model, and Euler-Lagrange derivation for optimal trajectories in discrete-time.
+   - Clear assumptions and limitations; proofs/sketches where appropriate (e.g., show first-order approximation of expected slippage under linear impact).
+   - A formal list of deliverables and unit tests for the Colab notebook.
+
+B) A Colab-ready Python test block that:
+   - Implements a minimal LOB data structure (price levels, queue sizes).
+   - Implements Poisson and univariate Hawkes order arrival generators (calibrate simple params).
+   - Simulates limit and market orders, cancellations, and computes realized mid-price path and slippage.
+   - Validates (unit tests) that: (1) conservation of volume holds, (2) impact scaling matches theory for small trades, (3) Hawkes clustering increases short-term variance as expected.

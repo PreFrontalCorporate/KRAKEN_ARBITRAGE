@@ -1,0 +1,15 @@
+We need adaptive online algorithms with regret guarantees for choosing venue, order type, and routing under non-stationarity. Produce:
+
+A) LaTeX block that:
+   - Formalize the online decision problem: action set (venue, order type), context vector (latency, spread, depth), loss function (execution cost or negative P&L).
+   - Present mirror descent/exponentiated gradient with regret bounds for convex losses; derive the update equations and explain step-size selection and projections.
+   - Present contextual bandits (e.g., Thompson Sampling, Exp4) adapted for non-stationary environments; include theoretical regret bounds or windowed-reset variants.
+   - Discuss adversarial settings (minimax regret) and how to incorporate change-point resets.
+
+B) Colab-ready Python block that:
+   - Implements a synthetic environment where venue performance drifts adversarially.
+   - Implements a mirror-descent router and a contextual bandit baseline (Thompson Sampling or Exp3/Exp4).
+   - Runs experiments showing sublinear regret for mirror descent in convex settings and demonstrates adaptability under regime shifts using resets or discounted weights.
+   - Includes unit tests that confirm basic regret scaling on toy sequences.
+
+Provide clear interfaces so this module plugs into ExecutionEngine and CostModel.

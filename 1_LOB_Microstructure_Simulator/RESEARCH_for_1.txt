@@ -1,0 +1,635 @@
+A Theoretical and Computational Framework for Simulating Limit Order Book Dynamics and Optimal ExecutionPart A: A Rigorous Theoretical Framework for Limit Order Book MicrostructureThis section establishes the formal mathematical and conceptual foundation of the Limit Order Book (LOB), serving as a prerequisite for the subsequent modeling of its dynamics and the analysis of optimal trading strategies. The framework deconstructs the LOB from a high-level market mechanism into its atomic components, providing rigorous definitions grounded in established financial literature.Section 1: Formalisms of the Limit Order Book1.1 The LOB as a Priority Queue SystemThe majority of modern financial exchanges, including prominent centralized exchanges (CEXs) like Kraken, utilize an electronic system to store, match, and execute the trading intentions of market participants. The core data structure underpinning this system is the Limit Order Book (LOB). For each tradable asset, a dedicated LOB provides a transparent, real-time view of the currently available, or "visible," market supply and demand.1 The price formation process within this environment is a self-organized phenomenon, driven by the continuous submission, cancellation, and execution of orders.Fundamentally, the LOB operates as a sophisticated priority queueing system. The primary sorting criterion for orders is price priority: buy orders (bids) are prioritized from the highest price downwards, while sell orders (asks) are prioritized from the lowest price upwards.3 At any given price level, multiple orders may exist. These are further sorted by time priority, where orders that were submitted earlier are given precedence. This combined price-time priority rule is typically implemented as a First-In-First-Out (FIFO) mechanism within each price queue.1 Consequently, the LOB can be conceptualized not as a monolithic entity, but as a collection of distinct queues, each corresponding to a discrete price level, where orders await execution according to these strict priority rules.2 This queuing perspective is not merely a technical detail; it is fundamental to understanding the valuation of an order, as an order's position within its queue is a primary determinant of its execution probability and its exposure to market risk.31.2 Formal Definitions: Order Tuples, Limit vs. Market Orders, and CancellationsTo model the LOB with mathematical precision, it is necessary to formalize the concept of an order. An order, O, is a visible declaration of a market participant's intent to trade a specific quantity of an asset at a specified price. It can be formally defined as a tuple:O=(ϵo​,po​,vo​,τo​)where:ϵo​∈{+1,−1} denotes the sign or direction of the order. By convention, a buy (bid) order corresponds to ϵo​=+1, and a sell (ask) order corresponds to ϵo​=−1.po​∈R+ is the price at which the participant wishes to trade. This price must belong to a discrete set of permissible price levels defined by the exchange.vo​∈Z+ is the volume or size of the order, representing the number of shares or units of the asset to be exchanged. This is typically an integer multiple of a minimum quantity. An equivalent and common notation uses a signed volume ωx​, where ωx​<0 for a buy and ωx​>0 for a sell, obviating the need for a separate ϵo​ parameter.2τo​∈R+ is the submission time of the order, a continuous variable recorded with high precision (often to the nanosecond) that is critical for establishing time priority.Market participants can submit three principal types of orders that drive the LOB's evolution:Limit Order (LO): A limit order is an instruction to buy or sell a fixed volume of an asset at a specified price po​ or better. For a buy order, "better" means a price less than or equal to po​; for a sell order, it means a price greater than or equal to po​. If a limit order is not immediately executable against an existing order on the opposite side of the book, it is placed in the LOB at its specified price level, where it rests until it is either executed or cancelled.1 By resting in the book, limit orders provide liquidity to the market.4Market Order (MO): A market order is an instruction to buy or sell a fixed volume immediately at the best available price(s) currently in the LOB. A buy market order will execute against the sell limit order(s) with the lowest price(s), while a sell market order will execute against the buy limit order(s) with the highest price(s). If the volume at the best price is insufficient to fill the entire market order, the remainder "walks the book," executing against orders at progressively worse prices until the order is filled. Market orders consume liquidity from the book and are therefore subject to higher implicit transaction costs.1Cancellation Order: A cancellation order is an instruction to withdraw a previously submitted and still-resting limit order from the LOB. This action is typically free of direct transaction costs.1.3 Fundamental Microstructure Variables: Tick Size, Lot Size, Bid-Ask Spread, and Mid-PriceThe state of the LOB and the rules governing it are defined by a set of fundamental variables:Tick Size (θ): The tick size is the minimum permissible price increment between different price levels in the LOB.1 It is a regulatory parameter set by the exchange, which discretizes the price grid. For example, if a stock price is 100.00 USD and the tick size is 0.01 USD, the next possible price levels are 99.99 USD and 100.01 USD. The choice of tick size is a non-trivial decision that balances the trade-off between price priority and time priority. A very small tick size overly favors price priority, as traders can jump ahead of the queue for a negligible price improvement, discouraging the posting of patient limit orders. Conversely, a very large tick size overly favors time priority, potentially leading to wide spreads and inefficient pricing.6Lot Size (σ): The lot size is the smallest amount of the asset that can be traded. All order volumes must be integer multiples of the lot size.2Best Bid and Best Ask: At any time t, the LOB is characterized by its best bid price, Pb(t), which is the highest price among all active buy orders, and its best ask price, Pa(t), which is the lowest price among all active sell orders.4 The pair (Pb(t),Pa(t)) is often referred to as the Best Bid and Offer (BBO) or the "top of the book."Quoted Bid-Ask Spread: The difference between the best ask and best bid prices is the quoted spread, S(t)=Pa(t)−Pb(t).4 The spread represents the cost of an immediate round-trip transaction (i.e., buying at the ask and immediately selling at the bid) and is a primary measure of market tightness and illiquidity.4Mid-Price: A common proxy for the unobserved "true" or "efficient" price of an asset is the mid-price, defined as the simple average of the best bid and ask prices 2:M(t)=2Pa(t)+Pb(t)​While widely used for its simplicity, the mid-price can be a naive estimator, especially when the volumes available at the bid and ask are highly imbalanced.41.4 Quantifying Market State: Liquidity, Depth, and Queue PositionBeyond the top-of-book prices, a more complete description of the market state requires quantifying the volume available for trading.Liquidity: Liquidity is a broad and multifaceted concept that is notoriously difficult to define with a single metric. In his seminal work, Kyle (1985) identified three key dimensions of a liquid market 2:Tightness: The cost of executing a small trade, typically measured by the bid-ask spread.Depth: The volume of trades that can be executed without causing a significant change in the price.Resiliency: The speed at which prices recover from a random, uninformative shock.In practice, liquidity is often used as a synonym for the volume of resting orders available in the LOB, although this only captures the depth dimension.4 A truly research-grade simulator must be capable of measuring all three of Kyle's dimensions. While tightness and depth are static properties of a given LOB snapshot, resiliency is a dynamic property that can only be measured by observing the LOB's evolution in response to an event, such as a large market order.Depth: The depth at a specific price level p and time t is the aggregated volume of all orders resting at that price. For the bid side, the depth is nb​(p,t)=∑{o∈B(t)∣po​=p}​vo​, where B(t) is the set of all active buy orders.2 A similar definition applies to the ask side, na​(p,t).Queue Position: For a given limit order resting at a price level p, its queue position is its rank in the FIFO queue at that level. It can be quantified as the cumulative volume of orders at the same price that have time priority. An order at the front of the queue has a position of 0. This variable is of paramount importance for high-frequency and algorithmic traders for several reasons 3:Execution Priority: A better queue position guarantees earlier execution if a market order arrives.Reduced Waiting Time: This leads to a higher fill rate, as there is less time for the market price to move away from the order's limit price.3Lower Adverse Selection Costs: Orders at the front of a queue are executed by any incoming market order, regardless of its size. In contrast, orders deep in a large queue are executed only by very large market orders, which are more likely to originate from informed traders. A good queue position thus acts as a filter against trading with informed counterparties.3The value of a favorable queue position can be economically significant, driving a technological "arms race" in low-latency trading to secure priority.31.5 Microstructure NoiseEmpirical analysis of high-frequency financial data reveals that observed prices, such as the mid-price, do not follow a smooth, continuous path. Instead, they are composed of two unobservable components: a latent efficient price, p∗(t), which reflects the consensus fundamental value, and market microstructure noise, u(t).8 The observed log-price is typically modeled as an additive combination:logp(t)=logp∗(t)+u(t)This noise is not statistical error in the traditional sense but rather an emergent property arising from the mechanics of the trading process itself.8 Key sources of microstructure noise include:Bid-Ask Bounce: As market orders alternate between buying at the ask and selling at the bid, the mid-price will fluctuate around the efficient price even if the efficient price itself is stable.9Price Discreteness: The tick size constraint forces prices to jump between discrete levels, inducing a rounding error relative to the continuous efficient price.8Strategic Order Placement and Cancellation: High-frequency trading algorithms frequently place and cancel limit orders to probe for liquidity or react to minute changes in market information, causing rapid fluctuations in the BBO without any trades occurring.2At ultra-high frequencies, the variance of this noise component can be substantial and can dominate the variance of the efficient price process, leading to significant biases in naive volatility estimators.9 Therefore, a sophisticated LOB simulator should not treat noise as an external, additive input. Instead, the noise observed in the simulated mid-price path should be an emergent property generated endogenously by the correct implementation of the LOB's discrete mechanics, order flow dynamics, and matching engine rules. The validation of such a simulator hinges on its ability to replicate the statistical properties (e.g., variance, autocorrelation) of empirically observed microstructure noise.Table 1: Glossary of Formal Definitions and NotationSymbolDefinitionSection of First AppearanceOAn order tuple (ϵo​,po​,vo​,τo​).1.2ϵo​The sign of an order (+1 for buy, -1 for sell).1.2po​The limit price of an order.1.2vo​The volume (size) of an order.1.2τo​The submission timestamp of an order.1.2θThe tick size, the minimum price increment.1.3σThe lot size, the minimum volume increment.1.3Pb(t)The best bid price at time t.1.3Pa(t)The best ask price at time t.1.3S(t)The quoted bid-ask spread, Pa(t)−Pb(t).1.3M(t)The mid-price, (Pa(t)+Pb(t))/2.1.3p∗(t)The latent efficient price at time t.1.5u(t)The microstructure noise component of the price.1.5Section 2: Stochastic Modeling of LOB Event FlowsHaving established the static structure of the LOB, this section develops the dynamic engine of the simulation by modeling the arrival and departure of orders over time. The framework of temporal point processes provides the necessary mathematical tools to describe these event flows, progressing from a simple baseline model to a more realistic one that captures empirically observed market phenomena.2.1 Order Flow as a Temporal Point ProcessThe evolution of the LOB is driven by a sequence of discrete events—limit order submissions, market order arrivals, and cancellations—occurring in continuous time. Such a sequence is naturally modeled as a temporal point process.11 A point process is characterized by its conditional intensity function, λ(t∣Ht​), which represents the instantaneous rate of event arrivals at time t, given the history of all events Ht​ up to that time. Formally,$$\lambda(t | \mathcal{H}_t) dt = \mathbb{P}(\text{an event occurs in } The key assumptions are [11, 15]:
+1.  **Constant Rate:** The conditional intensity is a constant, $\lambda(t | \mathcal{H}_t) = \lambda > 0$. The rate does not depend on time or the history of past events.
+2.  **Independent Increments:** The number of events in any two non-overlapping time intervals are independent random variables.
+3.  **No Simultaneous Events:** The probability of more than one event occurring in an infinitesimally small interval is negligible.
+
+Under these assumptions, the number of events $N(t)$ occurring in a time interval of length $t$ follows a **Poisson distribution** with mean $\lambda t$ [12, 15]:
+
+$$P(N(t) = k) = \frac{(\lambda t)^k e^{-\lambda t}}{k!}, \quad k = 0, 1, 2, \dots$$
+
+A crucial consequence of the Poisson process assumptions is the **memoryless property**: the waiting time until the next event is independent of the time elapsed since the last event.[11] This implies that the inter-arrival times between consecutive events are independent and identically distributed according to an **exponential distribution** with rate $\lambda$.[11, 15]
+
+While mathematically tractable, the Poisson model's assumption of independence is a significant limitation when modeling financial order flow. Empirical data clearly shows that trading activity is clustered: periods of high activity tend to be followed by more high activity, and vice versa. The Poisson process, by its very nature, cannot capture this phenomenon.[13] It serves, however, as an essential theoretical baseline and a building block for more complex models.
+
+#### 2.3 The Hawkes Process for Self-Exciting Dynamics
+
+To capture the empirically observed clustering of trading activity, a more sophisticated model is required. The **Hawkes process** is a self-exciting point process where the arrival of an event temporarily increases the rate of future event arrivals.[16, 17] This provides a direct mechanism for modeling the feedback loops inherent in financial markets.
+
+For a univariate (single type of event) Hawkes process, the conditional intensity function takes the form [13]:
+
+$$\lambda(t) = \mu + \sum_{t_i < t} g(t - t_i)$$
+
+where:
+*   $\mu > 0$ is the **baseline intensity**. It represents the rate of exogenous event arrivals, akin to a background Poisson process driven by external news or factors not captured by the process's history.
+*   $g: \mathbb{R}^+ \to \mathbb{R}^+$ is the **excitation kernel** or **memory kernel**. This function describes the influence of a past event at time $t_i$ on the current intensity at time $t$. The sum is taken over the arrival times $t_i$ of all past events.
+
+A widely used and analytically tractable form for the kernel is the **exponential decay kernel** [13]:
+
+$$g(t) = \alpha e^{-\beta t}, \quad \text{for } t > 0$$
+
+The parameters have intuitive interpretations:
+*   $\alpha \ge 0$ is the **jump size** or **fertility**. It represents the magnitude of the instantaneous increase in intensity immediately following an event.
+*   $\beta > 0$ is the **decay rate**. It controls how quickly the influence of a past event fades over time.
+
+The combination of these components provides a powerful micro-foundational model for volatility clustering. An initial market event (e.g., a large trade) causes a spike in the intensity $\lambda(t)$ by an amount $\alpha$. This elevated intensity increases the probability of subsequent events occurring in the near future. These new events, in turn, cause their own spikes in intensity, leading to a cascade or cluster of activity. Over time, as the influence of past events decays at rate $\beta$, the intensity reverts to its baseline level $\mu$, and the market returns to a quieter state. This mechanism directly translates clustered order arrivals into periods of high price volatility.
+
+For the process to be stable and not "explode" with an infinite number of events in a finite time, the total number of "offspring" events generated by a single parent event must, on average, be less than one. This is captured by the **branching ratio**, $n = \int_0^\infty g(t) dt$. For the exponential kernel, this condition for stationarity is [13]:
+
+$$n = \frac{\alpha}{\beta} < 1$$
+
+#### 2.4 A Model for Order Cancellations
+
+Order cancellations are not random events that can be modeled by a simple time-dependent process. They are strategic decisions made by market participants based on economic incentives.[18] A rational agent will cancel a resting limit order when its expected profit becomes negative.[18, 19] The expected profit of a limit order is a function of several dynamic factors, including [18, 19]:
+1.  **Changes in Fundamental Value:** If news arrives that moves the fundamental value of the asset against the order's price (e.g., positive news for a sell order), its expected profit upon execution decreases, increasing the likelihood of cancellation.
+2.  **Changes in the LOB State:** The state of the LOB itself provides signals about the fundamental value and execution probability. An increase in the bid-ask spread, for example, may increase the expected profit of resting orders, making them less likely to be cancelled.
+3.  **Deterioration of Queue Position:** If a large volume of new orders is placed at the same price level but with higher time priority, an existing order's queue position worsens, increasing its expected time to execution and its exposure to adverse price movements. This increases its cancellation probability. Conversely, orders at the front of the queue are highly valuable and less likely to be cancelled.[3, 18, 20]
+
+A realistic simulator must therefore model the cancellation rate not as a fixed parameter, but as a function of the order's specific characteristics and the current state of the market. A simple but effective approach is to model the cancellation decision via a **hazard rate**, $\lambda_c(t, \mathcal{O}, LOB_t)$, which is the instantaneous probability of cancelling order $\mathcal{O}$ at time $t$, given the current LOB state. This rate could be a function of the order's queue position, the current spread, and depth imbalance. This creates a crucial feedback loop: changes in the LOB trigger cancellations, which in turn alter the LOB state.
+
+A more advanced simulation could employ a multivariate Hawkes process, where the arrival of one type of event (e.g., a market order) can cross-excite the intensity of other event types (e.g., cancellations and new limit orders). This would capture the complex, interdependent nature of LOB event flows, where a single piece of information can trigger a cascade of different but related actions by market participants.
+
+#### 2.5 The Emergence of Price Impact
+
+**Price impact** is the effect that a trade has on the market price of an asset. It is a direct consequence of the order flow interacting with the available liquidity in the LOB. A key stylized fact of market microstructure is that the relationship between the size of a trade and its impact is non-linear.[21, 22]
+
+For large institutional orders (metaorders) of total volume $Q$ that are executed over a period of time, the average price impact $I(Q)$ is empirically found to follow a surprisingly universal **square-root law** [23, 24, 25]:
+
+$$I(Q) \propto \sqrt{Q}$$
+
+This relationship holds across different asset classes, markets, and time periods.[24] However, for very small trade sizes, the impact is found to be **linear** [24, 25, 26]:
+
+$$I(Q) \propto Q$$
+
+Theoretical models based on the concept of a "latent" order book—the full universe of trading intentions, not just the visible LOB—can explain this observed crossover from a linear to a square-root regime. These models posit that the density of latent liquidity grows linearly away from the current price, which naturally gives rise to a square-root impact for orders large enough to consume this liquidity profile.24 This empirical reality presents a critical challenge for classical execution models, such as the Almgren-Chriss framework discussed next, which are built on the simplifying assumption of purely linear price impact.
+
+
+
+**Table 2: Comparative Analysis of Order Arrival Models**
+
+| Feature | Poisson Process | Univariate Hawkes Process |
+| :--- | :--- | :--- |
+| **Conditional Intensity $\lambda(t)$** | $\lambda(t) = \lambda$ (constant) | $\lambda(t) = \mu + \sum_{t_i < t} \alpha e^{-\beta(t-t_i)}$ |
+| **Key Assumption** | Events are independent. | Events are self-exciting. |
+| **Inter-arrival Times** | Independent & Exponentially distributed. | Dependent; shorter after recent events. |
+| **Memory Property** | Memoryless. | Has memory, length determined by $1/\beta$. |
+| **Captures Clustering?** | No. | Yes, by design. |
+| **Primary Limitation** | Fails to capture the empirically observed clustering of trading activity. | Univariate form does not capture cross-excitation between different event types. |
+
+
+
+### Section 3: The Almgren-Chriss Framework for Optimal Execution
+
+The problem of optimal execution addresses how a trader should break up a large parent order into smaller child orders over time to minimize trading costs. The seminal Almgren-Chriss (AC) model provides a rigorous mathematical framework for solving this problem by formalizing the trade-off between market impact costs and price risk.[27, 28, 29] This section presents a self-contained derivation of the AC model in its discrete-time formulation, leading to the continuous-time solution, and critically evaluates its underlying assumptions.
+
+#### 3.1 The Optimal Liquidation Problem in Discrete Time
+
+Consider a trader who needs to liquidate (sell) a total of $X_0$ shares of an asset over a finite time horizon $T$. The horizon is divided into $N$ discrete time intervals of equal length $\tau = T/N$, with time points $t_k = k\tau$ for $k = 0, 1, \dots, N$.28
+
+A **trading trajectory** is defined as the sequence of share holdings $(x_0, x_1, \dots, x_N)$, where $x_k$ is the number of shares held at time $t_k$. The trajectory is subject to the boundary conditions $x_0 = X_0$ (initial position) and $x_N = 0$ (full liquidation).[28]
+
+The **trading list** is the sequence of trades $(n_1, n_2, \dots, n_N)$, where $n_k = x_{k-1} - x_k$ is the number of shares sold during the $k$-th interval, $ The objective is to find the optimal trading trajectory that minimizes a specific cost function.
+
+#### 3.2 Price Dynamics Under Execution: Modeling Temporary and Permanent Market Impact
+
+The AC model assumes that the asset's price is affected by two distinct sources of friction: the underlying random price movement and the market impact of the trader's own actions.
+
+1.  **Unaffected Price Process:** The "unaffected" or "efficient" price $S_k$ (the price that would prevail in the absence of the trader's actions) is modeled as a discrete **arithmetic random walk** with zero drift [28]:$$S_k = S_{k-1} + \sigma \sqrt{\tau} \xi_k
+$$
+where $\sigma$ is the asset's volatility and $\xi_k$ are independent and identically distributed random variables with zero mean and unit variance (e.g., standard normal).[28]
+Market Impact: The trader's sales exert downward pressure on the price. The AC model decomposes this impact into two components, both assumed to be linear functions of the trading rate for analytical tractability.28Permanent Market Impact: This represents the lasting effect of the trade, presumed to reveal information to the market. Each trade permanently lowers the subsequent unaffected price path. The change in the unaffected price due to trading at rate vk​ is modeled as g(vk​)=γvk​τ, where γ is the permanent impact coefficient.28 The price process including this impact, S~k​, evolves as S~k​=S~k−1​+στ​ξk​−g(vk​).Temporary Market Impact: This represents the short-term cost of demanding liquidity. It is a transient price concession required to find counterparties quickly and does not affect the fundamental price. The effective execution price for the shares sold in interval k is further depressed by this temporary impact, modeled as h(vk​)=ηvk​, where η is the temporary impact coefficient.27The total cost of the liquidation, often measured as the implementation shortfall (the difference between the value of the initial position at the starting price and the total cash received), is the sum of the costs incurred in each period.3.3 The Mean-Variance Cost FunctionalThe core of the AC framework is the formalization of the trader's objective. The trader faces a fundamental trade-off:Trading slowly (low vk​) minimizes market impact costs but prolongs the holding period, increasing the exposure to the random fluctuations of the market (price risk).Trading quickly (high vk​) minimizes price risk by shortening the holding period but incurs high market impact costs.The AC model captures this trade-off by defining a cost functional that penalizes both the expected cost and the variance of the cost 27:U(x0​,…,xN​)=E[C]+λV[C]where C is the total cost (implementation shortfall) and λ>0 is the trader's coefficient of risk aversion. A higher λ indicates a greater aversion to uncertainty in the final cost, compelling the trader to execute more quickly to reduce variance.By integrating the price dynamics over the trading trajectory, the expected cost and variance can be shown to be (for a sale of X0​ shares, to a first approximation and ignoring some constant terms) 28:E[C]≈k=1∑N​ηvk2​τ=k=1∑N​η(τxk−1​−xk​​)2τV[C]=σ2k=1∑N​xk2​τThe optimization problem is to find the trading trajectory (xk​)k=0N​ that minimizes the combined functional:(xk​)min​k=1∑N​[η(τxk−1​−xk​​)2τ+λσ2xk2​τ]subject to x0​=X0​ and xN​=0.3.4 Derivation of the Optimal Trading Trajectory via the Calculus of VariationsWhile the problem can be solved in discrete time using dynamic programming, the structure of the optimal solution is most clearly seen by taking the continuous-time limit as N→∞ and τ→0. In this limit, the trajectory becomes a continuous function x(t), the trading rate becomes its derivative x˙(t), and the summation becomes an integral. The cost functional to be minimized is 31:J[x(t)]=∫0T​(ηx˙(t)2+λσ2x(t)2)dtThis is a classic problem in the calculus of variations. The function x(t) that minimizes this integral must satisfy the Euler-Lagrange equation.27 Let the integrand be the Lagrangian L(t,x,x˙)=ηx˙2+λσ2x2. The Euler-Lagrange equation is:∂x∂L​−dtd​(∂x˙∂L​)=0Computing the partial derivatives:∂x∂L​=2λσ2x(t)∂x˙∂L​=2ηx˙(t)Substituting these into the equation gives:2λσ2x(t)−dtd​(2ηx˙(t))=0λσ2x(t)−ηx¨(t)=0This simplifies to a second-order linear ordinary differential equation (ODE) with constant coefficients 31:x¨(t)−κ2x(t)=0,where κ=ηλσ2​​The parameter κ has units of inverse time and characterizes the optimal timescale of liquidation. Its inverse, 1/κ, is the characteristic time over which it is optimal to hold the position.The general solution to this ODE is x(t)=C1​eκt+C2​e−κt. We solve for the constants C1​ and C2​ using the boundary conditions x(0)=X0​ and x(T)=0. This yields the unique optimal trading trajectory 31:x(t)=X0​sinh(κT)sinh(κ(T−t))​The optimal trading speed is v(t)=−x˙(t)=X0​sinh(κT)κcosh(κ(T−t))​. The hyperbolic shape indicates that the optimal strategy is front-loaded: the trading rate is highest at the beginning and decreases as the position is liquidated.27 As risk aversion λ→∞, κ→∞, and the strategy approaches immediate liquidation. As risk aversion λ→0, κ→0, and the strategy approaches a constant trading rate (a Time-Weighted Average Price or TWAP strategy). The primary value of this solution is not as a direct, practical algorithm but as an idealized strategic benchmark. It provides the average rate at which a trader should aim to execute, around which a real, adaptive algorithm can make tactical, opportunistic decisions based on the live LOB state.3.5 Critical Analysis: Assumptions, Limitations, and Potential ExtensionsThe elegance and tractability of the Almgren-Chriss model come at the cost of several strong simplifying assumptions. A research-grade perspective requires a critical evaluation of these limitations:Static, Open-Loop Strategy: The derived optimal trajectory is a deterministic, pre-committed schedule. It is an "open-loop" strategy that does not adapt to any new information or changes in market conditions that arrive during the execution horizon.32 Real-world execution algorithms are "closed-loop," constantly adjusting their behavior based on the live LOB data.Linear Market Impact: The model's cornerstone assumption of linear impact is empirically valid only for small trade sizes. As established in Section 2.5, the impact of large orders is better described by a concave, square-root function.24 Applying a linear model to a large liquidation will systematically misestimate the true execution costs.Exogenous and Constant Parameters: The model treats volatility (σ), permanent impact (γ), and temporary impact (η) as known and constant. In reality, these parameters are stochastic, time-varying, and state-dependent. Volatility exhibits clustering, and market impact depends heavily on the current state of liquidity in the LOB. A practical implementation would require a sophisticated "outer loop" for real-time parameter estimation, a non-trivial challenge in itself.Arithmetic Price Process: The assumption of an arithmetic random walk for the price process implies that price changes are additive and independent of the price level. A geometric Brownian motion, which assumes constant percentage returns, is often considered a more realistic model for stock prices.33Mean-Variance Objective: While standard in portfolio theory, the mean-variance objective is just one possible formulation of risk. It penalizes upside and downside deviations equally. Other risk measures, such as Conditional Value-at-Risk (CVaR), which focuses specifically on tail risk, could lead to different optimal strategies.32These limitations highlight that the AC model is a foundational but idealized framework. Modern research in optimal execution focuses on relaxing these assumptions, for example by incorporating dynamic programming to create adaptive strategies, using more realistic impact models, and considering alternative risk measures.Section 4: Simulator Design and Validation ProtocolThis section translates the preceding theoretical framework into a formal specification for the Python implementation. It serves as a blueprint, defining the deliverables and the criteria by which their correctness and validity will be judged.4.1 Formal List of Deliverables for the Python SimulatorThe Python implementation, designed for a Colab environment, will consist of the following components:LOB Data Structure: A LimitOrderBook class will be implemented.Functionality: It must store separate bid and ask sides, with each price level containing a FIFO queue of individual orders.Methods: It must expose methods for adding new limit orders (add_order), cancelling existing limit orders by ID (cancel_order), and processing market orders (process_market_order).State Access: It must provide efficient access to the BBO and the depth at any price level.Event Generators: Two functions will be provided to generate sequences of event arrival times.poisson_generator(rate, duration): This function will yield event times according to a homogeneous Poisson process with a specified mean arrival rate.hawkes_generator(mu, alpha, beta, duration): This function will yield event times for a univariate Hawkes process with an exponential kernel, parameterized by its baseline intensity mu, jump size alpha, and decay rate beta.Simulation Engine: A primary simulate function will orchestrate the simulation.Initialization: It will initialize an empty LimitOrderBook object.Event Loop: It will iterate through event times produced by a chosen generator.Event Handling: At each event time, it will randomly determine the type of event (e.g., limit order, market order, cancellation) and its parameters (e.g., side, price, size). It will then call the appropriate method on the LimitOrderBook object to update its state.Logging: It will record a time series of key market metrics, including the timestamp, BBO, mid-price, total traded volume, and the details of each execution.Metrics and Outputs: The simulation will produce a structured output (e.g., a list of dictionaries or a pandas DataFrame) containing the time-stamped log of LOB states and events. This output will be used to calculate realized mid-price paths and the execution slippage for simulated market orders.4.2 Specification of Unit Tests and Validation CriteriaA suite of unit tests will be provided to ensure the simulator's integrity. These tests are designed to cover both the deterministic rules of the LOB and the statistical properties of the stochastic models. This reflects a mature approach to simulation design, distinguishing between tests of correctness (verifying the implementation of deterministic rules) and tests of validity (verifying that the simulation is statistically consistent with the underlying theory).Test 1: Conservation of Volume (Correctness): This test will submit a market order to a pre-defined LOB. It will assert that the total volume removed from the resting limit orders exactly equals the volume of the executed portion of the market order. This ensures the basic accounting of the matching engine is correct.Test 2: Price-Time Priority (Correctness): This test will construct a LOB with multiple price levels and multiple orders at each level. It will then submit a market order large enough to "walk the book." The test will assert two conditions: (a) the market order executes against the best price levels first (price priority), and (b) within a single price level, it executes against orders in their submission order (time priority).Test 3: Impact Scaling Validation (Validity): This test will simulate a series of small market orders against a stable LOB. It will measure the average realized slippage (difference between the pre-trade mid-price and the average execution price). The test will then assert that this empirical slippage is statistically consistent with a simple linear impact model, thereby connecting the emergent behavior of the simulator back to the theoretical assumptions of the AC model for small trades.Test 4: Hawkes Process Clustering Effect (Validity): This test will generate two long sequences of inter-arrival times: one from the Poisson generator and one from the Hawkes generator, both calibrated to have the same mean arrival rate. It will then calculate a measure of dispersion, such as the coefficient of variation (std dev / mean), for both sequences. The test will assert that the coefficient of variation for the Hawkes process inter-arrival times is significantly greater than that of the Poisson process (which should be close to 1, a property of the exponential distribution). This validates that the Hawkes implementation correctly produces the intended event clustering.Part B: A Colab-Ready Python Test BlockThis section provides a self-contained Python code block designed for immediate execution in Google Colab. It implements the minimal Limit Order Book (LOB) data structure, the Poisson and Hawkes order arrival generators, and the unit tests specified in Part A. The code is extensively annotated to explain the implementation details and their connection to the theoretical concepts.Python# ==============================================================================
+# Part B: Colab-Ready Python Implementation and Unit Tests
+#
+# This block contains a complete, self-contained implementation of a Limit
+# Order Book simulator and its validation suite. It can be copied and pasted
+# directly into a Google Colab notebook for execution.
+#
+# Dependencies: numpy
+# Optional but recommended for LOB implementation: sortedcontainers
+#!pip install sortedcontainers
+# ==============================================================================
+
+import numpy as np
+import collections
+import unittest
+import time
+import math
+
+# For a more performant LOB, sortedcontainers is highly recommended.
+# It provides a SortedDict which is implemented as a balanced binary tree,
+# offering O(log N) for insertions, deletions, and lookups.
+# For this pedagogical example, we will use a simpler dictionary-based approach
+# and manage sorted keys manually, which is less efficient for large books
+# but more transparent.
+try:
+    from sortedcontainers import SortedDict
+except ImportError:
+    print("Warning: `sortedcontainers` not found. Using a less efficient dict-based LOB.")
+    # Fallback to a simple dict if sortedcontainers is not available
+    SortedDict = dict
+
+
+# ==============================================================================
+# 1. Limit Order Book (LOB) Data Structure Implementation
+# ==============================================================================
+
+class LimitOrderBook:
+    """
+    A simplified implementation of a Limit Order Book (LOB).
+
+    This class manages the two sides of the book (bids and asks) and processes
+    limit orders, market orders, and cancellations. It follows a price-time
+    priority matching algorithm.
+
+    Attributes:
+        bids (SortedDict): A collection of buy orders, keyed by price.
+                           Prices are sorted in descending order.
+        asks (SortedDict): A collection of sell orders, keyed by price.
+                           Prices are sorted in ascending order.
+        order_map (dict): A mapping from order_id to the order object for
+                          O(1) lookup and cancellation.
+    """
+    def __init__(self):
+        # Bids are orders to buy. We want to match market sells against the highest bid.
+        # A SortedDict for bids would naturally sort keys (prices) ascending.
+        # To get the best bid (highest price), we would need the last element.
+        # To make it symmetric with asks, we can use a negative price key for bids.
+        self.bids = SortedDict()  # Key: price, Value: collections.deque of orders
+        self.asks = SortedDict()  # Key: price, Value: collections.deque of orders
+        self.order_map = {}
+        self._order_id_counter = 0
+
+    def _get_next_order_id(self):
+        self._order_id_counter += 1
+        return self._order_id_counter
+
+    @property
+    def best_bid(self):
+        """Returns the highest bid price, or None if no bids exist."""
+        if not self.bids:
+            return None
+        return self.bids.peekitem(-1) # peekitem(-1) gets the largest key
+
+    @property
+    def best_ask(self):
+        """Returns the lowest ask price, or None if no asks exist."""
+        if not self.asks:
+            return None
+        return self.asks.peekitem(0) # peekitem(0) gets the smallest key
+
+    def get_mid_price(self):
+        """Calculates the mid-price of the book."""
+        if self.best_bid is not None and self.best_ask is not None:
+            return (self.best_bid + self.best_ask) / 2.0
+        return None
+
+    def add_limit_order(self, side, price, size, timestamp):
+        """
+        Adds a new limit order to the book.
+
+        Args:
+            side (str): 'buy' or 'sell'.
+            price (float): The limit price of the order.
+            size (int): The volume/size of the order.
+            timestamp (float): The submission time of the order.
+
+        Returns:
+            int: The unique ID of the newly created order.
+        """
+        order_id = self._get_next_order_id()
+        order = {
+            'id': order_id,
+            'side': side,
+            'price': price,
+            'size': size,
+            'timestamp': timestamp
+        }
+
+        self.order_map[order_id] = order
+
+        if side == 'buy':
+            book_side = self.bids
+        else:
+            book_side = self.asks
+
+        if price not in book_side:
+            book_side[price] = collections.deque()
+
+        book_side[price].append(order)
+        return order_id
+
+    def cancel_order(self, order_id):
+        """
+        Cancels a resting limit order from the book.
+
+        Args:
+            order_id (int): The ID of the order to cancel.
+
+        Returns:
+            bool: True if the order was found and cancelled, False otherwise.
+        """
+        if order_id not in self.order_map:
+            return False
+
+        order_to_cancel = self.order_map[order_id]
+        price = order_to_cancel['price']
+        side = order_to_cancel['side']
+
+        if side == 'buy':
+            book_side = self.bids
+        else:
+            book_side = self.asks
+
+        if price in book_side:
+            queue = book_side[price]
+            # This is O(N) where N is queue length. A more complex structure
+            # could make this O(1) by having orders be nodes in a linked list.
+            try:
+                queue.remove(order_to_cancel)
+                if not queue:
+                    del book_side[price]
+                del self.order_map[order_id]
+                return True
+            except ValueError:
+                # Order might have been executed just before cancellation
+                return False
+        return False
+
+    def process_market_order(self, side, size):
+        """
+        Processes a market order, matching it against resting limit orders.
+
+        Args:
+            side (str): 'buy' or 'sell'.
+            size (int): The size of the market order.
+
+        Returns:
+            tuple: A tuple containing (trades, remaining_size).
+                   'trades' is a list of dictionaries, each representing a fill.
+                   'remaining_size' is the unfilled portion of the market order.
+        """
+        trades =
+        size_to_fill = size
+
+        if side == 'buy':
+            # A buy market order matches against the asks (sell limit orders)
+            book_side = self.asks
+            # We iterate through asks from lowest price to highest
+            price_levels = list(book_side.keys())
+        else:
+            # A sell market order matches against the bids (buy limit orders)
+            book_side = self.bids
+            # We iterate through bids from highest price to lowest
+            price_levels = reversed(list(book_side.keys()))
+
+        for price in price_levels:
+            if size_to_fill == 0:
+                break
+
+            queue = book_side[price]
+            while queue and size_to_fill > 0:
+                resting_order = queue
+                trade_size = min(size_to_fill, resting_order['size'])
+
+                trades.append({
+                    'price': resting_order['price'],
+                    'size': trade_size,
+                    'aggressor_side': side,
+                    'resting_order_id': resting_order['id']
+                })
+
+                size_to_fill -= trade_size
+                resting_order['size'] -= trade_size
+
+                if resting_order['size'] == 0:
+                    # The resting order is fully filled
+                    queue.popleft()
+                    del self.order_map[resting_order['id']]
+
+            if not queue:
+                # The price level is now empty
+                del book_side[price]
+
+        return trades, size_to_fill
+
+# ==============================================================================
+# 2. Order Arrival Generators
+# ==============================================================================
+
+def poisson_generator(rate, duration):
+    """
+    Generates event arrival times according to a homogeneous Poisson process.
+    The time between events follows an exponential distribution.
+
+    Args:
+        rate (float): The average number of events per unit of time.
+        duration (float): The total duration of the simulation.
+
+    Yields:
+        float: The absolute time of the next event.
+    """
+    current_time = 0.0
+    while current_time < duration:
+        # Inter-arrival time is exponentially distributed
+        inter_arrival_time = np.random.exponential(scale=1.0 / rate)
+        current_time += inter_arrival_time
+        if current_time < duration:
+            yield current_time
+
+def hawkes_generator(mu, alpha, beta, duration):
+    """
+    Generates event arrival times for a univariate Hawkes process with an
+    exponential kernel using Ogata's thinning algorithm.
+
+    The intensity function is: lambda(t) = mu + alpha * sum(exp(-beta*(t-ti)))
+
+    Args:
+        mu (float): Baseline intensity.
+        alpha (float): Jump size after an event.
+        beta (float): Decay rate of the exponential kernel.
+        duration (float): The total duration of the simulation.
+
+    Yields:
+        float: The absolute time of the next event.
+    """
+    # Stationarity condition: alpha / beta < 1
+    if alpha >= beta:
+        print(f"Warning: Hawkes process may be non-stationary (alpha={alpha} >= beta={beta}).")
+
+    arrival_times =
+    current_time = 0.0
+
+    while current_time < duration:
+        # Calculate the current intensity
+        if not arrival_times:
+            intensity_at_t = mu
+        else:
+            # This is the recursive formulation for intensity calculation
+            # lambda(t) = mu + exp(-beta*(t - t_last)) * (lambda(t_last) - mu + alpha)
+            # However, for thinning, we need the max intensity in the next interval.
+            # The intensity only decays between events, so the maximum is at the
+            # start of the interval (immediately after the last event).
+            last_event_time = arrival_times[-1]
+            intensity_at_last_event = mu + alpha * sum(np.exp(-beta * (last_event_time - t_i)) for t_i in arrival_times)
+            max_intensity = intensity_at_last_event
+
+        # Generate a candidate event time from a dominating homogeneous Poisson process
+        # with rate max_intensity
+        time_to_next_candidate = np.random.exponential(scale=1.0 / max_intensity)
+        candidate_time = current_time + time_to_next_candidate
+
+        if candidate_time >= duration:
+            break
+
+        # Calculate the true intensity at the candidate time
+        intensity_at_candidate = mu
+        if arrival_times:
+           intensity_at_candidate += alpha * sum(np.exp(-beta * (candidate_time - t_i)) for t_i in arrival_times)
+
+        # Acceptance-rejection step (thinning)
+        acceptance_prob = intensity_at_candidate / max_intensity
+        if np.random.uniform() < acceptance_prob:
+            # Accept the candidate
+            arrival_times.append(candidate_time)
+            yield candidate_time
+
+        current_time = candidate_time
+
+
+# ==============================================================================
+# 3. Simulation Engine
+# ==============================================================================
+
+def simulate_lob(generator, duration, tick_size=0.01, initial_price=100.0):
+    """
+    Runs a simulation of the LOB using a given event generator.
+
+    Args:
+        generator: An iterator yielding event times (e.g., from poisson_generator).
+        duration (float): Total simulation time.
+        tick_size (float): The minimum price increment.
+        initial_price (float): The starting price for the simulation.
+
+    Returns:
+        tuple: (lob, log), where 'lob' is the final LOB state and 'log' is a
+               list of recorded states over time.
+    """
+    lob = LimitOrderBook()
+    log =
+    
+    # Pre-populate the book to have a spread
+    lob.add_limit_order('buy', initial_price - tick_size, 100, 0)
+    lob.add_limit_order('sell', initial_price + tick_size, 100, 0)
+
+    for event_time in generator:
+        mid_price = lob.get_mid_price()
+        if mid_price is None:
+            mid_price = initial_price # Fallback if book becomes one-sided
+
+        # Randomly choose an event type
+        event_type = np.random.choice(['limit', 'market', 'cancel'], p=[0.6, 0.2, 0.2])
+        side = np.random.choice(['buy', 'sell'])
+
+        if event_type == 'limit':
+            # Place a limit order near the BBO
+            price_offset = np.random.randint(0, 5) * tick_size
+            if side == 'buy':
+                price = mid_price - price_offset
+            else:
+                price = mid_price + price_offset
+            price = round(price / tick_size) * tick_size # Adhere to tick size
+            size = np.random.randint(10, 50)
+            lob.add_limit_order(side, price, size, event_time)
+
+        elif event_type == 'market':
+            size = np.random.randint(20, 80)
+            trades, _ = lob.process_market_order(side, size)
+            
+        elif event_type == 'cancel':
+            if lob.order_map:
+                order_id_to_cancel = np.random.choice(list(lob.order_map.keys()))
+                lob.cancel_order(order_id_to_cancel)
+        
+        log.append({
+            'time': event_time,
+            'best_bid': lob.best_bid,
+            'best_ask': lob.best_ask,
+            'mid_price': lob.get_mid_price()
+        })
+
+    return lob, log
+
+
+# ==============================================================================
+# 4. Unit Testing Framework
+# ==============================================================================
+
+class TestLOBSimulator(unittest.TestCase):
+    """Unit tests for the LOB and simulation components."""
+
+    def setUp(self):
+        """Set up a fresh LOB for each test and seed for reproducibility."""
+        self.lob = LimitOrderBook()
+        np.random.seed(42) # For deterministic tests
+
+    def test_volume_conservation(self):
+        """Test 1: Ensures volume is conserved during market order execution."""
+        print("\nRunning Test 1: Conservation of Volume...")
+        # Setup: Add resting orders
+        self.lob.add_limit_order('sell', 100.02, 50, 0)
+        self.lob.add_limit_order('sell', 100.03, 70, 0)
+        
+        # Action: Process a market order that partially consumes one level and
+        # fully consumes another.
+        market_order_size = 80
+        trades, remaining = self.lob.process_market_order('buy', market_order_size)
+        
+        # Verification
+        total_traded_volume = sum(trade['size'] for trade in trades)
+        self.assertEqual(total_traded_volume, market_order_size, "Traded volume must equal market order size")
+        self.assertEqual(remaining, 0, "Market order should be fully filled")
+        
+        # Check remaining state of the book
+        self.assertIsNone(self.lob.asks.get(100.02), "Price level 100.02 should be empty")
+        self.assertIsNotNone(self.lob.asks.get(100.03), "Price level 100.03 should still exist")
+        self.assertEqual(self.lob.asks[100.03]['size'], 70 - (80 - 50), "Remaining size at 100.03 is incorrect")
+        print("Test 1 PASSED.")
+
+    def test_price_time_priority(self):
+        """Test 2: Verifies correct price-time priority matching."""
+        print("\nRunning Test 2: Price-Time Priority...")
+        # Setup: Add orders with specific timestamps
+        # Best ask level
+        id1 = self.lob.add_limit_order('sell', 100.01, 20, 1.0) # First in time
+        id2 = self.lob.add_limit_order('sell', 100.01, 30, 2.0) # Second in time
+        # Worse ask level
+        id3 = self.lob.add_limit_order('sell', 100.02, 40, 0.5)
+        
+        # Action: Process a market order
+        trades, _ = self.lob.process_market_order('buy', 25)
+        
+        # Verification
+        # It should first hit 100.01 (price priority)
+        self.assertEqual(len(trades), 2)
+        self.assertEqual(trades['price'], 100.01)
+        self.assertEqual(trades['price'], 100.01)
+        
+        # It should first hit order id1 (time priority)
+        self.assertEqual(trades['resting_order_id'], id1)
+        self.assertEqual(trades['size'], 20) # Fully consumes first order
+        self.assertEqual(trades['resting_order_id'], id2)
+        self.assertEqual(trades['size'], 5) # Partially consumes second order
+        
+        # Check book state
+        self.assertEqual(self.lob.asks[100.01]['size'], 25) # 30 - 5
+        self.assertEqual(self.lob.asks[100.02]['size'], 40)
+        print("Test 2 PASSED.")
+
+    def test_impact_scaling_for_small_trades(self):
+        """Test 3: Validates that slippage scales as expected for small trades."""
+        print("\nRunning Test 3: Impact Scaling Validation...")
+        # Setup: A stable book
+        tick_size = 0.01
+        initial_price = 100.0
+        self.lob.add_limit_order('buy', initial_price - tick_size, 1000, 0)
+        self.lob.add_limit_order('sell', initial_price + tick_size, 1000, 0)
+        
+        pre_trade_mid_price = self.lob.get_mid_price()
+        self.assertEqual(pre_trade_mid_price, initial_price)
+        
+        # Action: Execute a small market order
+        market_order_size = 10
+        trades, _ = self.lob.process_market_order('buy', market_order_size)
+        
+        # Verification
+        # For a small buy order, it executes entirely at the best ask.
+        # Slippage = Execution Price - Mid-Price
+        # Execution Price = best_ask = mid_price + spread/2
+        # Expected Slippage = (mid_price + spread/2) - mid_price = spread/2
+        avg_exec_price = sum(t['price'] * t['size'] for t in trades) / sum(t['size'] for t in trades)
+        realized_slippage = avg_exec_price - pre_trade_mid_price
+        
+        spread = self.lob.best_ask - self.lob.best_bid if self.lob.best_ask and self.lob.best_bid else tick_size*2
+        expected_slippage = spread / 2.0
+        
+        self.assertAlmostEqual(realized_slippage, expected_slippage,
+                               msg="Slippage for small trade does not match theoretical expectation")
+        print("Test 3 PASSED.")
+        
+    def test_hawkes_clustering_increases_variance(self):
+        """Test 4: Validates that Hawkes process increases short-term variance."""
+        print("\nRunning Test 4: Hawkes Clustering Effect...")
+        # Parameters
+        duration = 1000
+        mean_rate = 5.0 # Target mean rate for both processes
+        
+        # Hawkes parameters (alpha/beta = 0.5, so stationary)
+        mu = 2.5
+        alpha = 2.5
+        beta = 5.0
+        
+        # Generate event times
+        poisson_events = list(poisson_generator(rate=mean_rate, duration=duration))
+        hawkes_events = list(hawkes_generator(mu=mu, alpha=alpha, beta=beta, duration=duration))
+        
+        # Calculate inter-arrival times
+        poisson_inter_arrivals = np.diff(poisson_events)
+        hawkes_inter_arrivals = np.diff(hawkes_events)
+        
+        # Calculate Coefficient of Variation (CV = std/mean)
+        # For an exponential distribution (from Poisson), CV should be ~1.
+        # For a clustered process (Hawkes), CV should be > 1.
+        cv_poisson = np.std(poisson_inter_arrivals) / np.mean(poisson_inter_arrivals)
+        cv_hawkes = np.std(hawkes_inter_arrivals) / np.mean(hawkes_inter_arrivals)
+        
+        print(f"  Poisson Inter-arrival CV: {cv_poisson:.4f} (Expected ~1.0)")
+        print(f"  Hawkes Inter-arrival CV:  {cv_hawkes:.4f} (Expected > 1.0)")
+        
+        self.assertGreater(cv_hawkes, cv_poisson, "Hawkes process should have higher inter-arrival time variance than Poisson")
+        self.assertGreater(cv_hawkes, 1.1, "Hawkes CV should be significantly greater than 1")
+        self.assertLess(abs(cv_poisson - 1.0), 0.15, "Poisson CV should be close to 1")
+        print("Test 4 PASSED.")
+
+
+# ==============================================================================
+# Main execution block to run the unit tests
+# ==============================================================================
+if __name__ == '__main__':
+    print("="*70)
+    print("Executing LOB Microstructure Simulator Unit Tests")
+    print("="*70)
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(TestLOBSimulator))
+    runner = unittest.TextTestRunner()
+    runner.run(suite)
+
+    # Example simulation run
+    print("\n" + "="*70)
+    print("Running an example simulation with Hawkes process...")
+    print("="*70)
+    np.random.seed(123)
+    sim_duration = 10 # seconds
+    hawkes_gen = hawkes_generator(mu=2.0, alpha=3.0, beta=5.0, duration=sim_duration)
+    final_lob, history = simulate_lob(hawkes_gen, duration=sim_duration)
+    
+    print(f"Simulation finished after {sim_duration} seconds.")
+    print(f"Total events processed: {len(history)}")
+    print(f"Final Best Bid: {final_lob.best_bid}")
+    print(f"Final Best Ask: {final_lob.best_ask}")
+    
+    # Simple plot of mid-price path
+    try:
+        import matplotlib.pyplot as plt
+        times = [log['time'] for log in history]
+        mid_prices = [log['mid_price'] for log in history if log['mid_price'] is not None]
+        time_points_with_price = [log['time'] for log in history if log['mid_price'] is not None]
+        
+        plt.figure(figsize=(12, 6))
+        plt.plot(time_points_with_price, mid_prices, marker='.', linestyle='-')
+        plt.title("Simulated Mid-Price Path (Hawkes Process)")
+        plt.xlabel("Time (s)")
+        plt.ylabel("Mid-Price ($)")
+        plt.grid(True)
+        plt.show()
+    except ImportError:
+        print("\nMatplotlib not found. Skipping plot of mid-price path.")
+

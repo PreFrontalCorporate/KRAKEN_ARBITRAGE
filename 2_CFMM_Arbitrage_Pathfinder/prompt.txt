@@ -1,0 +1,16 @@
+We need a mathematically exact theory + code for CFMMs (Uniswap v2/v3 style, Curve stableswap), and a graph-theoretic arbitrage pathfinder for DEX cycles. Produce:
+
+A) LaTeX block that:
+   - Defines CFMM invariant families (constant-product x·y=k, constant-sum, stableswap hybrid) and derives exact trade formulas (out(x_in) given reserves and fee).
+   - Prove monotonicity and concavity properties used for arbitrage bounds; show closed-form for marginal price and price impact.
+   - Formulate arbitrage detection as negative cycle detection with edge weights = −log( post-fee rate ). Provide proof that negative cycle implies profitable arbitrage ignoring gas and slippage.
+   - Provide methodology to compute maximal profitable trade size on an AMM cycle, including simultaneous multi-pool routing and execution ordering.
+   - State assumptions (no front-running, static reserves during computation) and what to relax later.
+
+B) Colab-ready Python block that:
+   - Implements exact AMM steppers for Uniswap v2 and a Curve-like stableswap model.
+   - Builds a small DEX graph (3–5 tokens, multiple pools) and runs Bellman-Ford to detect arbitrage cycles.
+   - For each detected negative cycle, computes the optimal trade sizes via 1D numeric optimization (Newton/Brent) maximizing realized P&L given fee and slippage.
+   - Unit tests: numerical exactness checks against analytic Uniswap v2 formulas; check that small arbitrage disappears if fees/gas exceed P&L.
+
+Include deterministic seeds and clear comments; ready for execution and extension.

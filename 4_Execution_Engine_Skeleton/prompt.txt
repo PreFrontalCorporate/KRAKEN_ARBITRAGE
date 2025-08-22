@@ -1,0 +1,15 @@
+We will later execute on Kraken; for now we need a secure, theory-first execution engine skeleton (no credentials) to test order flows and execution logic. Produce:
+
+A) LaTeX block that:
+   - Formally models order types (limit, market, IOC, FOK, post-only) and their execution semantics with queue-position effects.
+   - Presents an execution decision problem: choose order type & size to minimize expected cost+penalty subject to fill probability constraints. Provide convex relaxation if needed.
+   - Describe safe post-trade checks: fill validation, idempotency, reconciliation, and risk limits for leveraged positions.
+   - Provide a list of integration tests that must pass before live usage.
+
+B) Colab-ready Python code block that:
+   - Implements an ExecutionEngine skeleton with mock Kraken API layer (simulated REST/ws stubs).
+   - Implements order placement logic: simulate limit order placement with queue position, cancellation policies, and a reconciliation routine that polls/syncs.
+   - Adds unit tests: order-post/cancel/fill lifecycle and idempotency (re-play same order and ensure no double-fill).
+   - Provides a safe dry-run mode where execution decisions are logged but not sent.
+
+No API keys required. Put clear TODOs where real Kraken wiring will be inserted.

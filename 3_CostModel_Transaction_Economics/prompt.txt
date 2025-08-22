@@ -1,0 +1,14 @@
+We need a rigorous, auditable transaction cost model that captures all costs for cross-venue crypto trading (CEX and DEX). Produce:
+
+A) LaTeX block that:
+   - Formally defines cost primitives: maker/taker fees, withdrawal/deposit fees, gas, oracle/gas price dynamics, funding/borrow rates for leverage, spread, and slippage (impact).
+   - Shows how to incorporate cost into arbitrage inequality (profit condition) and into expected utility optimizations.
+   - Derives a compound cost function used in routing decisions; show convexity/nonconvexity properties and conditions for existence of optimal trade size.
+   - Discuss calibration procedures (empirical estimation, maximum-likelihood for stable fees, bootstrap for funding-rate distributions) and statistical tests for cost-stability.
+
+B) Colab-ready Python block that:
+   - Implements a CostModel class with parameters for CEX fees, DEX fees, gas estimator, funding rate simulator, and slippage function from LOB/CFMM modules.
+   - Provides unit tests: sanity checks where if fees exceed arbitrage returns then no-trade; variance-stress tests where funding spikes cause leveraged trades to become infeasible.
+   - Includes a small calibration demo: given synthetic historical funding rates and gas, estimate expected daily funding cost and 95% quantile.
+
+Ensure code is modular to plug into previous LOB/CFMM steppers.

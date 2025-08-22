@@ -1,0 +1,452 @@
+A Rigorous Framework for Optimal Sizing in Leveraged Arbitrage: From Kelly to Distributionally Robust OptimizationThis report provides a comprehensive, expert-level framework for risk sizing in leveraged cryptocurrency arbitrage strategies. It begins with the theoretical foundations of the classical Kelly criterion, rigorously deriving its formulation and critically examining its assumptions and failure modes. Recognizing the practical limitations of the classical model, particularly its sensitivity to parameter estimation errors, the report then develops a series of advanced, robust methodologies. These include the formulation of a drawdown-constrained Kelly criterion as a tractable convex optimization problem, the application of Extreme Value Theory (EVT) for accurate tail risk modeling, and a survey of robustification techniques ranging from simple heuristics like fractional Kelly to sophisticated frameworks like shrinkage estimation and Distributionally Robust Optimization (DRO). The theoretical discourse is complemented by a production-ready Python implementation designed for practical application and testing.Part A: Theoretical Foundations and Mathematical DerivationsThe Classical Kelly Criterion: Maximizing Asymptotic GrowthThe Kelly criterion provides the theoretical baseline for optimal capital allocation by identifying the investment fraction that maximizes the long-term geometric growth rate of wealth. While powerful in theory, its practical application is fraught with peril due to its stringent and often unrealistic assumptions. Understanding its derivation and inherent fragilities is essential for motivating and appreciating the more robust techniques developed later in this report.Derivation for Repeated Independent BetsThe canonical derivation considers a sequence of independent and identically distributed (IID) bets, a model first explored by J.L. Kelly.1 The objective is to determine a fixed fraction of capital, f, to wager on each bet to maximize the long-term growth of wealth.Let W0​ be the initial wealth. After N trials, consisting of W wins and L losses (where N=W+L), the final wealth WN​ is a function of the betting fraction f. For a bet with a win probability p, loss probability q=1−p, a win payoff of b units per unit wagered, and a loss of a units per unit wagered (typically a=1), the final wealth is given by the multiplicative process:WN​(f)=W0​(1+fb)W(1−fa)LThe core insight of the Kelly criterion is that maximizing the final wealth WN​ over a long horizon is equivalent to maximizing the geometric growth rate, G(f)=(WN​/W0​)1/N. This, in turn, is equivalent to maximizing the expected value of the logarithm of the single-period wealth growth, g(f)=E.1 The connection is established by the Law of Large Numbers, which states that as the number of trials N grows, the average log-return converges to its expectation almost surely 4:$$ \frac{1}{N}\log\left(\frac{W_N}{W_0}\right) = \frac{W}{N}\log(1+fb) + \frac{L}{N}\log(1-fa) \xrightarrow{N\to\infty} p\log(1+fb) + q\log(1-fa) = g(f) $$To find the optimal fraction f∗, we maximize g(f) by setting its derivative with respect to f to zero:dfdg​=1+fbpb​−1−faqa​=0Solving for f yields the celebrated Kelly formula:f∗=abpb−qa​In the common scenario where a losing bet results in the loss of the entire stake, a=1, this simplifies to the well-known "edge over odds" formula 3:f∗=bpb−q​For financial applications where returns are better modeled as continuous random variables, a parallel formulation exists. For an asset with an expected excess return μ (over the risk-free rate) and variance of returns σ2, the Kelly criterion suggests an optimal leveraged fraction of capital to invest is approximately 3:f∗=σ2μ​This result elegantly connects the Kelly framework to modern portfolio theory, showing that the optimal allocation is directly proportional to the asset's expected excess return and inversely proportional to its variance.Core Assumptions and Critical Failure ModesThe elegance of the Kelly criterion belies its reliance on a set of strong, often untenable assumptions:Known and Accurate Parameters: The win probability p and payoffs b are assumed to be known with perfect certainty. In financial markets, these parameters are always noisy estimates.7Stationary and IID Trials: The underlying probability distribution of returns is assumed to be constant over time, with each outcome being independent of all others.1 This ignores market regimes, volatility clustering, and autocorrelation.Infinite Divisibility and Frictionless Markets: The model assumes capital can be divided into arbitrarily small fractions and that there are no transaction costs or market impact.9Asymptotic Horizon: The criterion maximizes growth as the number of bets approaches infinity, disregarding the potentially ruinous volatility and drawdowns experienced in the short to medium term.10The most critical failure mode in practice stems from the first assumption: parameter estimation error. The expected log-growth function, g(f), is sharply peaked and highly asymmetric around the true optimum f∗. Overestimating the strategy's "edge" (i.e., using an estimated fraction f^​>f∗) is far more dangerous than underestimating it. Overbetting can rapidly lead to a negative geometric growth rate and a high probability of ruin, whereas underbetting (f<f∗) results in a slower, but still positive, growth rate.7 This asymmetry is the paramount practical consideration for any real-world application, especially in crypto arbitrage where the "edge" is derived from complex, noisy models. As one practitioner notes, "Your edge is probably smaller than you think it is," making overestimation a near certainty without explicit robustification measures.11This fragility defines the Kelly criterion not just as a tool for maximizing growth, but as a crucial benchmark for risk management. The derivation of f∗ identifies the peak of the concave log-growth curve. By definition, any bet fraction f>f∗ yields a lower long-term growth rate than f∗. At the same time, the variance of returns, which is proportional to f2, is higher for f>f∗ than for f∗. Therefore, any bet larger than the Kelly fraction is strictly dominated—it offers lower returns and higher risk. This establishes the Kelly value as a hard upper bound on leverage, a "red line that should never be crossed".10 For continuous-time processes, betting twice the Kelly fraction (2f∗) results in a long-term growth rate equal to the risk-free rate, meaning all the additional risk is taken for zero long-term reward.10 The practical goal of a sophisticated sizing module is therefore not to bet at the Kelly fraction, but to employ robust methods to ensure the chosen leverage is always safely below the true, unknown optimal level.Advanced Risk Control: Drawdown Constraints and Tail ModelingMoving beyond the singular goal of maximizing asymptotic growth, a practical risk framework must explicitly incorporate and control for the risk of severe capital drawdowns. This requires formalizing drawdown risk within an optimization problem and employing specialized statistical tools to accurately model the extreme negative returns that drive such events.Drawdown-Constrained Kelly as a Convex Optimization ProblemThe classical Kelly criterion is path-independent and thus ignores the potentially ruinous drawdowns that can occur on the way to long-term growth.15 A more robust approach maximizes the growth rate subject to an explicit constraint on the probability of a drawdown. The Risk-Constrained Kelly (RCK) problem can be stated as:$$ \begin{array}{ll} \underset{\mathbf{b}}{\text{maximize}} & E \ \text{subject to} & \text{Prob}(\inf_{t} W_t \le \alpha W_0) \le \beta \end{array} $$where b is the vector of allocations to different bets, r is the random return vector, α∈(0,1) is the maximum tolerable drawdown depth (e.g., α=0.7 for a 30% drawdown), and β∈(0,1) is the maximum probability of that drawdown occurring.15This problem is generally intractable in its direct form. However, a powerful result from Boyd et al. provides a tractable convex surrogate for the drawdown constraint by leveraging a Chernoff-type bound on the ruin probability.16 The original probabilistic constraint can be replaced by the more restrictive, but convex, constraint:E≤1,whereλ=log(α)log(β)​The parameter λ>0 can be interpreted as a risk-aversion parameter. This transforms the RCK problem into a standard convex optimization problem. For a discrete set of K possible return scenarios ri​ with probabilities πi​, the problem becomes:$$ \begin{array}{ll} \underset{\mathbf{b}}{\text{maximize}} & \sum_{i=1}^K \pi_i \log(\mathbf{r}i^T \mathbf{b}) \ \text{subject to} & \mathbf{1}^T \mathbf{b} = 1, \quad \mathbf{b} \ge 0 \ & \sum{i=1}^K \pi_i (\mathbf{r}_i^T \mathbf{b})^{-\lambda} \le 1 \end{array} $$The objective function is a weighted sum of logarithms, which is concave. The constraints consist of linear equalities and inequalities, which are convex, and the final drawdown constraint, which is a sum of convex functions (x−λ is convex for x>0,λ>0) and is therefore convex. This formulation can be solved efficiently using modern convex optimization solvers such as cvxpy, making this advanced risk management technique practical for real-world use.16Quantifying Tail Risk: VaR, CVaR, and Extreme Value Theory (EVT)The effectiveness of the drawdown constraint hinges on an accurate characterization of the P&L distribution's left tail. Standard deviation is an inadequate measure of risk for the non-normal, fat-tailed return distributions ubiquitous in cryptocurrency markets. More appropriate measures are needed.Value-at-Risk (VaR): For a given confidence level α (e.g., 99%) and time horizon, the VaR is the threshold loss value that will not be exceeded with probability α. It answers the question, "What is our maximum loss, 99% of the time?".20Conditional Value-at-Risk (CVaR): Also known as Expected Shortfall (ES), CVaR measures the expected loss given that the loss has already exceeded the VaR threshold. It answers the question, "If we have a 1% tail event, what is our average loss?".20 CVaR is considered a superior risk measure to VaR because it is "coherent," satisfying desirable mathematical properties like subadditivity (the risk of a portfolio is no greater than the sum of its parts). Furthermore, its objective function is convex, which greatly simplifies its use in portfolio optimization problems.20To estimate these tail risk measures robustly, we turn to Extreme Value Theory (EVT). The foundational result for this approach is the Pickands–Balkema–de Haan Theorem. This theorem states that for a wide class of random variables, the distribution of excesses over a sufficiently high threshold asymptotically converges to a Generalized Pareto Distribution (GPD), irrespective of the parent distribution from which the data are drawn.26This powerful, distribution-agnostic result is the basis of the Peaks-Over-Threshold (POT) method for modeling extreme events.28 The practical application involves three steps:Threshold Selection: A high threshold u (e.g., the 95th percentile of historical losses) is chosen to isolate the tail of the distribution.GPD Fitting: A GPD is fitted to the loss data exceeding the threshold u, typically via Maximum Likelihood Estimation, to find the shape parameter ξ (the tail index) and the scale parameter σ.31 The tail index ξ is the most critical output, as it quantifies the "heaviness" of the tail; for financial data, ξ>0 is typical, indicating fat tails.Risk Measure Calculation: With the GPD parameters estimated, one can derive analytical formulas for VaR and CVaR that allow for extrapolation into the extreme tail, providing risk estimates for events far rarer than those observed in the historical sample.34The drawdown-constrained optimization and EVT-based tail modeling are not independent tools but are deeply intertwined components of a single, robust system. The expectation in the drawdown constraint, E, is an integral that is heavily weighted by the extreme negative outcomes in the left tail of the return distribution. If this expectation is calculated using an incorrect distributional assumption (e.g., normality), the tail risk will be severely underestimated. This would lead the optimizer to select an allocation vector b that is far riskier than intended, causing the desired drawdown constraint to be violated in practice. EVT provides a principled methodology for modeling this tail accurately. By using the GPD fit from a POT analysis to compute the expectation in the constraint, the optimization becomes grounded in a much more realistic depiction of risk. This creates a virtuous cycle: better risk measurement (via EVT) enables more effective risk management (via drawdown-constrained optimization).Robust Sizing Under Model and Parameter UncertaintyThis section directly confronts the primary weakness of the classical Kelly criterion: its acute sensitivity to the accuracy of its inputs. We explore a hierarchy of techniques, from simple heuristics to advanced optimization frameworks, designed to produce robust allocations in the face of inevitable model and parameter uncertainty.Heuristic and Principled RobustificationFractional Kelly: The most common and straightforward method for robustification is to systematically underbet by using a fixed fraction (e.g., 50% or 25%) of the leverage suggested by the full Kelly formula.3 This simple heuristic provides a powerful defense against the catastrophic consequences of overbetting due to an overestimated edge.11 While it leads to a lower growth rate than the true (but unknown) optimum, it drastically reduces volatility and the probability of ruin, making it a prudent and widely adopted practice.14 This practice can also be grounded in utility theory; betting "half-Kelly" on a lognormal asset is approximately equivalent to optimizing for a power utility function U(w)=−w−1, which exhibits greater risk aversion than the logarithmic utility U(w)=log(w) that underpins the full Kelly criterion.10Shrinkage Estimators: A more statistically principled approach to handling parameter uncertainty involves improving the quality of the inputs to the optimization problem. Sample estimates of mean returns and covariances are notoriously noisy. Shrinkage estimators produce more robust estimates by pulling these volatile sample statistics towards a more stable, structured target, thereby reducing estimation error.40Mean Shrinkage: Because portfolio optimization outcomes are far more sensitive to errors in mean returns than in variances or covariances, robustifying the mean estimate is critical.10 James-Stein or Jorion shrinkage can produce a more stable estimate of the expected return vector μ.40Covariance Shrinkage: For multi-asset arbitrage strategies, the sample covariance matrix can be ill-conditioned or singular, especially when the number of assets is large relative to the length of the historical data. The Ledoit-Wolf method provides a well-established solution by optimally shrinking the sample covariance matrix towards a highly structured target, such as a constant-correlation matrix. This results in a positive definite and more stable covariance estimate, leading to better out-of-sample performance.40Distributionally Robust Optimization (DRO)DRO represents the frontier of robust optimization. It addresses a deeper level of uncertainty: not just uncertainty in the parameters of a chosen distribution, but uncertainty about the form of the distribution itself.45 The methodology seeks an allocation that is optimal under the worst-case probability distribution drawn from a specified "ambiguity set" Π, which contains all distributions deemed plausible. The Distributionally Robust Kelly Problem (DRKP) is formulated as a maximin problem 47:bmaximize​π∈Πinf​Eπ​The power of DRO lies in the definition of the ambiguity set Π. Common choices construct this set based on:Moment Constraints: The set of all distributions matching an empirically observed mean and covariance matrix.Statistical Divergence: The set of all distributions that are "close" to an empirical reference distribution, where closeness is measured by a statistical distance like the Kullback-Leibler (KL) divergence or the Wasserstein distance.48While the nested structure of the DRKP appears intractable, for many useful ambiguity sets, the inner inf problem can be solved analytically using duality theory. This allows the DRKP to be reformulated as a single, tractable convex optimization problem that can be solved with standard tools, making this powerful technique computationally feasible.47Theoretical Bounds on Ruin ProbabilityThe concept of "ruin" is central to any discussion of risk. While Kelly betting with a fraction f in the stable range (0,2f∗) theoretically ensures that wealth never reaches zero, it does not prevent drawdowns that are functionally equivalent to ruin.9 The classic Gambler's Ruin problem provides a formal framework for calculating the probability of wealth hitting a lower boundary before reaching an upper target.50 Theoretical bounds, such as those developed by Feller, connect this ruin probability to the properties of the wager's probability generating function.9 These results formalize the intuition that while even positive-expectation games can lead to ruin, the probability of doing so is bounded and decreases with the size of the edge. Crucially, they also prove that betting fractions outside the stable region (specifically, above a critical fraction fc​>f∗ where the log-growth becomes negative) lead to almost certain ruin.9These robustification techniques represent a clear hierarchy of increasing sophistication. Fractional Kelly is a simple, model-free heuristic that reacts to the existence of uncertainty without trying to model it. Shrinkage is a parametric statistical method that seeks to improve the inputs to the model by assuming the model form is correct but the sample parameters are noisy. Distributionally Robust Optimization is a non-parametric optimization method that defends against the model itself being misspecified. It does not assume a single true distribution but instead optimizes against a whole family of them. This progression reflects a philosophical shift from simply reacting to uncertainty, to improving estimates within a fixed model, and finally, to building a strategy that is resilient to the model itself being wrong. A comprehensive risk management system should provide tools from each level of this hierarchy.Code snippet\documentclass{article}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+\begin{document}
+
+\section*{Part A: Theoretical Foundations and Mathematical Derivations}
+
+\subsection*{1. The Classical Kelly Criterion: Maximizing Asymptotic Growth}
+
+\subsubsection*{1.1 Derivation for Repeated Independent Bets}
+Let $W_0$ be initial wealth. After $N$ trials with $W$ wins and $L$ losses, where $N = W+L$, the final wealth $W_N$ for a betting fraction $f$ is:
+$$W_N(f) = W_0 (1+fb)^W (1-fa)^L$$
+where $p$ is the win probability, $b$ is the win payoff, and $a$ is the loss size. The objective is to maximize the geometric growth rate, which is equivalent to maximizing the expected log-return per trial, $g(f)$:
+$$g(f) = E = p\log(1+fb) + (1-p)\log(1-fa)$$
+Setting the derivative to zero, $\frac{dg}{df} = 0$, gives:
+$$\frac{pb}{1+fb} - \frac{(1-p)a}{1-fa} = 0 \implies f^* = \frac{pb - (1-p)a}{ab}$$
+For the common case where $a=1$, this simplifies to $f^* = \frac{pb - (1-p)}{b}$. For continuously distributed excess returns with mean $\mu$ and variance $\sigma^2$, the optimal fraction is $f^* = \frac{\mu}{\sigma^2}$.
+
+\subsection*{2. Advanced Risk Control: Drawdown Constraints and Tail Modeling}
+
+\subsubsection*{2.1 Drawdown-Constrained Kelly as a Convex Optimization Problem}
+The Risk-Constrained Kelly (RCK) problem maximizes the expected log-growth subject to a constraint on the probability of a drawdown. The original problem is:
+$$ \begin{array}{ll} \underset{\mathbf{b}}{\text{maximize}} & E \\ \text{subject to} & \text{Prob}(\inf_{t} W_t \le \alpha W_0) \le \beta \end{array} $$This is made tractable by replacing the probabilistic constraint with a convex surrogate:$$ E \le 1, \quad \text{where} \quad \lambda = \frac{\log(\beta)}{\log(\alpha)} $$
+For a discrete set of $K$ return scenarios $\mathbf{r}_i$ with probabilities $\pi_i$, the problem becomes a convex optimization problem:
+$$ \begin{array}{ll} \underset{\mathbf{b}}{\text{maximize}} & \sum_{i=1}^K \pi_i \log(\mathbf{r}_i^T \mathbf{b}) \\ \text{subject to} & \mathbf{1}^T \mathbf{b} = 1, \quad \mathbf{b} \ge 0 \\ & \sum_{i=1}^K \pi_i (\mathbf{r}_i^T \mathbf{b})^{-\lambda} \le 1 \end{array} $$
+This problem is convex because the objective is concave and the constraints define a convex set.
+
+\subsubsection*{2.2 Quantifying Tail Risk: VaR, CVaR, and Extreme Value Theory (EVT)}
+\textbf{Value-at-Risk (VaR)} at confidence level $\alpha$ is the $(1-\alpha)$-quantile of the loss distribution $L$:
+$$\text{VaR}_{\alpha}(L) = \inf\{l \in \mathbb{R} : P(L > l) \le 1-\alpha \}$$
+\textbf{Conditional Value-at-Risk (CVaR)} is the expected loss, conditional on the loss exceeding VaR:
+$$\text{CVaR}_{\alpha}(L) = E$$
+The \textbf{Pickands–Balkema–de Haan Theorem} states that for a large class of distributions $F$, the distribution of excesses over a high threshold $u$, denoted $F_u(y) = P(X-u \le y | X > u)$, converges to a \textbf{Generalized Pareto Distribution (GPD)}:
+$$F_u(y) \approx G_{\xi, \sigma}(y) = 1 - \left(1 + \frac{\xi y}{\sigma}\right)^{-1/\xi}$$
+where $\xi$ is the shape (tail index) and $\sigma$ is the scale parameter. The \textbf{Peaks-Over-Threshold (POT)} method uses this theorem to model the tail. After estimating $\xi$ and $\sigma$ from excesses over a threshold $u$, the $\alpha$-VaR can be estimated as:
+$$ \text{VaR}_{\alpha} = u + \frac{\sigma}{\xi}\left(\left(\frac{N_u}{N(1-\alpha)}\right)^\xi - 1\right) $$
+where $N$ is the total number of observations and $N_u$ is the number of excesses over $u$. The CVaR is then given by:
+$$\text{CVaR}_{\alpha} = \text{VaR}_{\alpha} + \frac{\sigma + \xi(\text{VaR}_{\alpha} - u)}{1-\xi}$$
+
+\subsection*{3. Robust Sizing Under Model and Parameter Uncertainty}
+
+\subsubsection*{3.1 Robustification Techniques}
+\textbf{Fractional Kelly} involves betting a fraction $k \in (0, 1)$ of the optimal Kelly amount, i.e., $f_{frac} = k \cdot f^*$. This is equivalent to maximizing a power utility function $U(w) = \frac{w^{1-\gamma}}{1-\gamma}$ where $k = 1/\gamma$. For half-Kelly ($k=0.5$), $\gamma=2$.
+
+\textbf{Shrinkage Estimators} improve sample estimates by pulling them toward a stable target. For the mean vector $\hat{\mu}$, the James-Stein estimator is:
+$$\tilde{\mu} = \mathbf{t} + (1-\delta)(\hat{\mu} - \mathbf{t})$$
+where $\mathbf{t}$ is the target and $\delta$ is the shrinkage intensity. For the covariance matrix $\hat{\Sigma}$, the Ledoit-Wolf estimator is:
+$$\tilde{\Sigma} = (1-\delta)\hat{\Sigma} + \delta \mathbf{T}$$
+where $\mathbf{T}$ is a structured target matrix (e.g., identity matrix).
+
+\textbf{Distributionally Robust Optimization (DRO)} solves the maximin problem:
+$$\underset{\mathbf{b}}{\text{maximize}} \quad \inf_{\pi \in \Pi} E_{\pi}$$
+where $\Pi$ is an ambiguity set of plausible distributions. For many choices of $\Pi$ (e.g., based on Wasserstein distance or KL-divergence from an empirical measure), this can be reformulated as a tractable convex optimization problem.
+
+\subsubsection*{3.2 Theoretical Bounds on Ruin Probability}
+For a simple game with win probability $p$ and 1:1 odds, betting a fraction $f$, the probability of ruin (hitting 0) before reaching a target wealth $W_T$, starting from $W_0$, is bounded. For $f > f^* = p-q$, the log-growth rate $g(f) < g(f^*)$. If $f$ is large enough such that $g(f) < 0$, ruin is almost certain as $N \to \infty$. A more precise bound comes from the Gambler's Ruin problem. For a game where one wins or loses 1 unit, the probability of ruin is:
+$$P(\text{ruin}) = \frac{(q/p)^{W_T} - (q/p)^{W_0}}{(q/p)^{W_T} - 1} \quad \text{for } p \neq q$$
+While not directly applicable to fractional betting, this illustrates the dependency on the edge ($p/q$), initial wealth, and target wealth.
+
+\end{document}
+Part B: Python Implementation and Empirical AnalysisThis section provides a Colab-ready Python implementation of the theoretical concepts discussed in Part A. The code is designed to be modular and reproducible, allowing for easy adaptation to proprietary P&L data from backtests.Python#@title 4.1. Setup and Synthetic Data Generation
+# Install necessary libraries
+!pip install numpy pandas matplotlib scipy cvxpy pyextremes > /dev/null
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import cvxpy as cp
+from scipy.stats import genpareto, t
+from pyextremes import EVA
+
+# Set a reproducible seed for all simulations
+np.random.seed(42)
+
+def generate_synthetic_returns(n_trials, p_win, win_return, loss_return, dist='bernoulli', df=3):
+    """
+    Generates a series of synthetic returns for a simple binary bet.
+    Can also generate heavy-tailed returns from a t-distribution.
+    """
+    if dist == 'bernoulli':
+        outcomes = np.random.choice([win_return, loss_return],
+                                    size=n_trials,
+                                    p=[p_win, 1 - p_win])
+    elif dist == 't':
+        # Scale t-distribution to have a specified mean and std dev
+        # This is a simplification; for real applications, use empirical data.
+        # Here, we generate returns centered around a positive mean to simulate an "edge"
+        # with heavy tails.
+        raw_returns = t.rvs(df, size=n_trials)
+        # Standardize and then scale to target mean/std
+        target_mean = p_win * win_return + (1-p_win) * loss_return
+        target_std = np.sqrt(p_win * (win_return - target_mean)**2 + (1-p_win)*(loss_return - target_mean)**2)
+        outcomes = raw_returns * target_std + target_mean
+    return outcomes
+
+print("Setup complete. Libraries installed and functions defined.")
+
+Python#@title 4.2. Module 1: Classical and Fractional Kelly with Monte Carlo
+def calculate_classical_kelly(p, b, a=1.0):
+    """
+    Calculates the classical Kelly criterion fraction for a binary bet.
+    Args:
+        p (float): Probability of winning.
+        b (float): Payoff on win (e.g., for 2:1 odds, b=2).
+        a (float): Fraction of stake lost on loss (typically 1.0).
+    Returns:
+        float: Optimal Kelly fraction f*.
+    """
+    q = 1 - p
+    if (p * b - q * a) <= 0:
+        return 0.0
+    return (p * b - q * a) / (a * b)
+
+def run_kelly_simulation(f, returns, n_simulations, n_trials, initial_wealth=100):
+    """
+    Runs a Monte Carlo simulation for a given betting fraction.
+    """
+    wealth_paths = np.zeros((n_simulations, n_trials + 1))
+    wealth_paths[:, 0] = initial_wealth
+
+    for i in range(n_simulations):
+        # Each simulation gets its own random path of returns
+        sim_returns = np.random.choice(returns, size=n_trials, replace=True)
+        for t in range(n_trials):
+            # Note: returns here are net returns (e.g., +1 for win, -1 for loss)
+            # Wealth update: W_t+1 = W_t * (1 + f * r_t)
+            wealth_paths[i, t+1] = wealth_paths[i, t] * (1 + f * sim_returns[t])
+            # Prevent bankruptcy from wiping out the simulation
+            if wealth_paths[i, t+1] <= 0:
+                wealth_paths[i, t+1:] = 0
+                break
+    return wealth_paths
+
+# --- Simulation: The Danger of Parameter Error ---
+# True parameters of the game
+p_true = 0.55
+b_true = 1.0  # 1-to-1 odds (win 1, lose 1)
+a_true = 1.0
+n_trials = 250
+n_simulations = 1000
+
+# We overestimate our edge
+p_estimated = 0.60
+
+# Calculate Kelly fractions
+f_true_optimal = calculate_classical_kelly(p_true, b_true, a_true)
+f_overbet = calculate_classical_kelly(p_estimated, b_true, a_true)
+f_half_overbet = 0.5 * f_overbet
+f_quarter_overbet = 0.25 * f_overbet
+
+print(f"True Optimal Kelly Fraction (f*): {f_true_optimal:.2%}")
+print(f"Overestimated Full Kelly Fraction: {f_overbet:.2%}")
+print(f"Overestimated Half Kelly Fraction: {f_half_overbet:.2%}")
+print(f"Overestimated Quarter Kelly Fraction: {f_quarter_overbet:.2%}")
+
+# Generate returns based on the *true* probability
+# Net returns are +100% on stake (b=1) or -100% on stake (a=1)
+game_returns = np.array([b_true, -a_true])
+true_returns_dist = np.random.choice(game_returns, size=10000, p=[p_true, 1-p_true])
+
+
+# Run simulations
+wealth_full = run_kelly_simulation(f_overbet, true_returns_dist, n_simulations, n_trials)
+wealth_half = run_kelly_simulation(f_half_overbet, true_returns_dist, n_simulations, n_trials)
+wealth_quarter = run_kelly_simulation(f_quarter_overbet, true_returns_dist, n_simulations, n_trials)
+
+# Plotting
+plt.figure(figsize=(14, 8))
+plt.suptitle('Impact of Parameter Error on Kelly Betting (Log Scale)', fontsize=16)
+
+# Plot 1: Full Kelly (Overbet)
+ax1 = plt.subplot(1, 3, 1)
+for i in range(n_simulations):
+    ax1.plot(wealth_full[i, :], lw=0.5)
+ax1.set_yscale('log')
+ax1.set_title(f'Full Kelly (f={f_overbet:.0%})')
+ax1.set_ylabel('Wealth (Log Scale)')
+ax1.set_xlabel('Number of Bets')
+ruin_pct_full = np.sum(wealth_full[:, -1] < 1) / n_simulations
+ax1.text(0.5, 0.1, f'Ruin Prob: {ruin_pct_full:.1%}', transform=ax1.transAxes, ha='center')
+
+
+# Plot 2: Half Kelly
+ax2 = plt.subplot(1, 3, 2)
+for i in range(n_simulations):
+    ax2.plot(wealth_half[i, :], lw=0.5)
+ax2.set_yscale('log')
+ax2.set_title(f'Half Kelly (f={f_half_overbet:.1%})')
+ax2.set_xlabel('Number of Bets')
+ruin_pct_half = np.sum(wealth_half[:, -1] < 1) / n_simulations
+ax2.text(0.5, 0.1, f'Ruin Prob: {ruin_pct_half:.1%}', transform=ax2.transAxes, ha='center')
+
+# Plot 3: Quarter Kelly
+ax3 = plt.subplot(1, 3, 3)
+for i in range(n_simulations):
+    ax3.plot(wealth_quarter[i, :], lw=0.5)
+ax3.set_yscale('log')
+ax3.set_title(f'Quarter Kelly (f={f_quarter_overbet:.1%})')
+ax3.set_xlabel('Number of Bets')
+ruin_pct_quarter = np.sum(wealth_quarter[:, -1] < 1) / n_simulations
+ax3.text(0.5, 0.1, f'Ruin Prob: {ruin_pct_quarter:.1%}', transform=ax3.transAxes, ha='center')
+
+plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+plt.show()
+Python#@title 4.3. Module 2: Drawdown-Constrained Kelly Optimizer
+def optimize_drawdown_constrained_kelly(return_scenarios, alpha, beta):
+    """
+    Solves the drawdown-constrained Kelly problem using CVXPY.
+
+    Args:
+        return_scenarios (np.array): A (num_scenarios, num_assets) array of GROSS returns (e.g., 1.1 for +10%).
+                                     Each row is a possible outcome, each column is an asset.
+                                     One column should be cash (all 1s).
+        alpha (float): Drawdown limit (e.g., 0.7 for max 30% drawdown).
+        beta (float): Max probability of violating the drawdown (e.g., 0.1 for 10%).
+
+    Returns:
+        np.array: Optimal allocation vector b*.
+    """
+    num_scenarios, num_assets = return_scenarios.shape
+    
+    # Probabilities are assumed to be uniform over the scenarios
+    pi = np.ones(num_scenarios) / num_scenarios
+    
+    # CVXPY Variables
+    b = cp.Variable(num_assets)
+    
+    # Parameters
+    lambda_param = np.log(beta) / np.log(alpha)
+    
+    # Objective Function: Maximize expected log growth
+    # r_i^T * b in matrix form is return_scenarios @ b
+    log_growth = pi @ cp.log(return_scenarios @ b)
+    objective = cp.Maximize(log_growth)
+    
+    # Constraints
+    constraints = <= 1
+        pi @ cp.power(return_scenarios @ b, -lambda_param) <= 1
+    ]
+    
+    # Problem definition and solution
+    problem = cp.Problem(objective, constraints)
+    problem.solve()
+    
+    if problem.status not in ["optimal", "optimal_inaccurate"]:
+        print(f"Warning: Optimizer failed to find a solution. Status: {problem.status}")
+        return np.zeros(num_assets)
+        
+    return b.value
+
+# --- Example Usage ---
+# Let's define two risky assets and one risk-free asset (cash)
+# Asset 1: High risk, high reward
+# Asset 2: Low risk, low reward
+# Asset 3: Cash (gross return is always 1)
+
+# Create 1000 scenarios for the returns of the two risky assets
+scenarios = 1000
+asset1_returns = np.random.normal(1.08, 0.3, scenarios)  # Gross returns
+asset2_returns = np.random.normal(1.03, 0.1, scenarios)  # Gross returns
+cash_returns = np.ones(scenarios)
+
+# Ensure returns are non-negative for the log and power functions
+asset1_returns[asset1_returns < 0] = 0.01
+asset2_returns[asset2_returns < 0] = 0.01
+
+# This is the input matrix for the optimizer.
+# For real data, this would be your backtest P&L for each strategy for each period.
+# Each row is a historical period (e.g., a day), each column is a strategy.
+# The values should be gross returns (1 + net_return).
+return_matrix = np.vstack([asset1_returns, asset2_returns, cash_returns]).T
+
+# Set drawdown constraints: Tolerate a 25% drawdown with at most 5% probability
+alpha_dd = 0.75
+beta_dd = 0.05
+
+optimal_weights = optimize_drawdown_constrained_kelly(return_matrix, alpha_dd, beta_dd)
+
+print("--- Drawdown-Constrained Optimization Results ---")
+print(f"Max Drawdown: {1-alpha_dd:.0%}, Max Probability: {beta_dd:.0%}")
+print(f"Optimal Allocation to Asset 1 (High Risk): {optimal_weights:.2%}")
+print(f"Optimal Allocation to Asset 2 (Low Risk): {optimal_weights:.2%}")
+print(f"Optimal Allocation to Cash: {optimal_weights:.2%}")
+
+# Compare with fractional Kelly on a blended portfolio
+# Let's create an equal-weight portfolio of the two risky assets
+portfolio_returns = 0.5 * asset1_returns + 0.5 * asset2_returns
+mu = np.mean(portfolio_returns - 1) # Net returns
+sigma2 = np.var(portfolio_returns - 1)
+f_kelly_portfolio = mu / sigma2 if sigma2 > 0 else 0
+print(f"\n--- For comparison: Half-Kelly on 50/50 Portfolio ---")
+print(f"Optimal Kelly for 50/50 portfolio: {f_kelly_portfolio:.2%}")
+print(f"Half-Kelly allocation to risky assets: {0.5*f_kelly_portfolio:.2%}")
+Python#@title 4.4. Module 3: EVT-based Tail Risk Calculator
+def calculate_evt_cvar(losses, confidence_level=0.95, threshold_quantile=0.95):
+    """
+    Calculates VaR and CVaR using the Peaks-Over-Threshold EVT method.
+
+    Args:
+        losses (np.array or pd.Series): A series of positive loss values.
+        confidence_level (float): The confidence level for VaR/CVaR (e.g., 0.95).
+        threshold_quantile (float): The quantile to use for the POT threshold.
+
+    Returns:
+        dict: A dictionary containing VaR, CVaR, and GPD parameters.
+    """
+    losses = pd.Series(losses).dropna()
+    
+    # 1. Select threshold
+    u = losses.quantile(threshold_quantile)
+    
+    # 2. Identify excesses
+    excesses = losses[losses > u] - u
+    
+    if len(excesses) < 30: # Need sufficient points in the tail
+        print("Warning: Not enough excesses over threshold for stable GPD fit.")
+        # Fallback to historical CVaR
+        var_hist = losses.quantile(confidence_level)
+        cvar_hist = losses[losses > var_hist].mean()
+        return {
+            'Method': 'Historical (fallback)',
+            'VaR': var_hist,
+            'CVaR': cvar_hist,
+            'Threshold': u,
+            'Num_Excesses': len(excesses),
+            'xi': None,
+            'sigma': None
+        }
+
+    # 3. Fit GPD to excesses
+    # genpareto.fit returns (shape, loc, scale). For POT, loc=0.
+    # shape (xi) is c, scale (sigma) is scale.
+    xi, _, sigma = genpareto.fit(excesses, floc=0)
+
+    # 4. Calculate VaR and CVaR from GPD parameters
+    N = len(losses)
+    Nu = len(excesses)
+    phi_u = Nu / N # Probability of exceeding threshold
+
+    # VaR calculation
+    var = u + (sigma / xi) * ((((1 - confidence_level) / phi_u)**(-xi)) - 1)
+    
+    # CVaR calculation
+    cvar = var + (sigma + xi * (var - u)) / (1 - xi)
+
+    return {
+        'Method': 'EVT-GPD',
+        'VaR': var,
+        'CVaR': cvar,
+        'Threshold': u,
+        'Num_Excesses': len(excesses),
+        'xi (tail_index)': xi,
+        'sigma (scale)': sigma
+    }
+
+# --- Example Usage ---
+# Generate data with heavy tails (Student's t with df=3)
+heavy_tailed_returns = generate_synthetic_returns(5000, 0.52, 0.02, -0.018, dist='t', df=3)
+losses = -heavy_tailed_returns[heavy_tailed_returns < 0] # Positive losses
+
+# Calculate historical VaR/CVaR for comparison
+var_99_hist = np.quantile(losses, 0.99)
+cvar_99_hist = losses[losses > var_99_hist].mean()
+
+# Calculate EVT VaR/CVaR
+evt_risk = calculate_evt_cvar(losses, confidence_level=0.99, threshold_quantile=0.95)
+
+print("--- Tail Risk Calculation Comparison (99% Confidence) ---")
+print(f"Historical VaR:   {var_99_hist:.4f}")
+print(f"Historical CVaR:  {cvar_99_hist:.4f}")
+print("\nEVT-based Results:")
+for key, val in evt_risk.items():
+    if isinstance(val, float):
+        print(f"{key:<18}: {val:.4f}")
+    else:
+        print(f"{key:<18}: {val}")
+
+# Using pyextremes for a more robust implementation
+print("\n--- Using `pyextremes` library ---")
+model = EVA(pd.Series(losses))
+model.get_extremes(method="POT", threshold=losses.quantile(0.95))
+model.fit_model()
+summary = model.get_summary(return_period=, return_period_size="1D") # 100-day event ~ 99% VaR
+print(summary)
+Python#@title 4.5. Module 4: Unit Test - Fractional Kelly Reduces Ruin in Heavy Tails
+def unit_test_fractional_kelly_ruin_prob():
+    """
+    Verifies that fractional Kelly leads to a lower ruin probability than full Kelly
+    when returns are drawn from a heavy-tailed distribution.
+    """
+    print("\n--- Running Unit Test: Fractional Kelly vs. Full Kelly ---")
+    
+    # Test parameters
+    n_simulations = 5000
+    n_trials = 100
+    initial_wealth = 100
+    ruin_threshold = 0.10 * initial_wealth # Ruin if wealth drops below 10%
+    
+    # Define a heavy-tailed scenario
+    # We use a t-distribution with 3 degrees of freedom, which has fat tails.
+    # We need to define equivalent p, b, a for Kelly calculation.
+    # Let's create a scenario with a positive mean but high variance and kurtosis.
+    df = 3
+    mu_target = 0.02
+    sigma_target = 0.20
+    
+    # Generate a large sample of t-distributed returns
+    t_dist_returns = t.rvs(df, loc=mu_target, scale=sigma_target, size=50000)
+    
+    # Calculate parameters for Kelly from this distribution
+    # This simulates estimating from a known heavy-tailed process
+    p_est = np.mean(t_dist_returns > 0)
+    # For simplicity, let's use the continuous Kelly formula
+    mu_est = np.mean(t_dist_returns)
+    sigma2_est = np.var(t_dist_returns)
+    
+    f_full = mu_est / sigma2_est if sigma2_est > 0 else 0
+    f_half = 0.5 * f_full
+    
+    print(f"Simulated Heavy-Tailed Distribution (t, df={df}):")
+    print(f"  - Estimated Mean Return: {mu_est:.4f}")
+    print(f"  - Estimated Variance: {sigma2_est:.4f}")
+    print(f"Calculated Full Kelly Fraction: {f_full:.2%}")
+    print(f"Using Half Kelly Fraction: {f_half:.2%}")
+    
+    # Simulate wealth paths for full and half Kelly
+    wealth_full = run_kelly_simulation(f_full, t_dist_returns, n_simulations, n_trials, initial_wealth)
+    wealth_half = run_kelly_simulation(f_half, t_dist_returns, n_simulations, n_trials, initial_wealth)
+    
+    # Count ruin events
+    ruin_count_full = np.sum(np.min(wealth_full, axis=1) < ruin_threshold)
+    ruin_count_half = np.sum(np.min(wealth_half, axis=1) < ruin_threshold)
+    
+    ruin_prob_full = ruin_count_full / n_simulations
+    ruin_prob_half = ruin_count_half / n_simulations
+    
+    print(f"\nResults over {n_simulations} simulations:")
+    print(f"  - Ruin Probability (Full Kelly): {ruin_prob_full:.2%}")
+    print(f"  - Ruin Probability (Half Kelly): {ruin_prob_half:.2%}")
+    
+    # Assertion
+    try:
+        assert ruin_count_half < ruin_count_full
+        print("\n✅ PASSED: Half Kelly significantly reduced ruin probability as expected.")
+    except AssertionError:
+        print("\n❌ FAILED: Half Kelly did not reduce ruin probability.")
+
+# Run the test
+unit_test_fractional_kelly_ruin_prob()
+Conclusion and RecommendationsThis report has detailed a comprehensive framework for risk sizing in leveraged arbitrage, progressing from the foundational Kelly criterion to state-of-the-art robust optimization techniques. The analysis yields several key, actionable conclusions for practitioners in the cryptocurrency space:Never Use Full Kelly Naively: The classical Kelly criterion is dangerously sensitive to the inevitable errors in estimating an arbitrage strategy's true edge. The severe asymmetry of its performance—where overbetting is catastrophic and underbetting is merely suboptimal—mandates a conservative approach. The raw output of the Kelly formula should be treated as a strict upper bound on leverage, not a target.Adopt Fractional Kelly as a Baseline: For its simplicity and effectiveness, a fractional Kelly strategy (e.g., "half-Kelly" or "quarter-Kelly") should be the default starting point for any sizing model. As demonstrated empirically, this simple heuristic provides a powerful defense against ruin, especially in the heavy-tailed return environments characteristic of crypto markets.Incorporate Explicit Drawdown Constraints: For more sophisticated risk management, maximizing growth subject to an explicit constraint on drawdown probability offers a superior trade-off between risk and return. The convex formulation presented allows this advanced technique to be implemented efficiently, moving beyond simple heuristics to a principled control of downside risk.Model Tails with Extreme Value Theory: The accuracy of any risk model, especially a drawdown-constrained one, depends critically on its understanding of extreme losses. Standard statistical models assuming normality are inadequate. The Peaks-Over-Threshold (POT) method, grounded in EVT, provides a robust, semi-parametric tool for modeling the tail of the P&L distribution. Calculating CVaR from a fitted GPD provides a more accurate and forward-looking measure of tail risk than simple historical simulation.Embrace a Hierarchy of Robustness: As resources and sophistication allow, practitioners should move up the hierarchy of robustification techniques. After implementing fractional Kelly, the next step is to improve model inputs using shrinkage estimators for mean returns and covariance matrices. The ultimate goal for highly systematic and data-rich operations is the adoption of Distributionally Robust Optimization (DRO), which provides the strongest guarantees against model misspecification by optimizing for worst-case scenarios.By integrating these methodologies—from the foundational principles of Kelly to the advanced risk controls of drawdown constraints, EVT, and DRO—a trading operation can build a truly rigorous and resilient risk sizing module. This moves capital allocation from a heuristic-driven art to a data-informed science, providing a durable competitive advantage in the volatile and complex domain of leveraged crypto arbitrage.

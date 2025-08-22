@@ -1,0 +1,15 @@
+We need a rigorous forecasting and regime detection module for short-horizon micro-trends and cross-exchange spreads. Produce:
+
+A) LaTeX block that:
+   - Define state-space model for price/spread: observation and transition equations. Provide Kalman filter derivation and steady-state Riccati solution where applicable.
+   - Define cointegration & error-correction model (ECM) for spread mean-reversion. Include statistical tests (ADF, Johansen) and finite-sample corrections.
+   - Present change-point detection (CUSUM, Bayesian online change point detection) and show how switching regimes should alter Kalman state noise and decision thresholds.
+   - Discuss overfitting controls: purged CV, walk-forward testing, multiple-testing correction, and realistic latency-aware features.
+
+B) Colab-ready Python block that:
+   - Implements a small synthetic environment: two correlated random walks with a small mean-reverting spread component and occasional regime shifts.
+   - Implements: Kalman filter (with numeric stability), ECM estimation, and a CUSUM change-point detector.
+   - Tests: show that Kalman reduces MSE vs naive predictor, ECM correctly predicts spread reversion with confidence intervals, and CUSUM detects regime shifts with controllable false-positive rate.
+   - Includes a small visualization (matplotlib) of state estimate vs true state (do not set colors explicitly).
+
+Make sure results are reproducible with seeded RNG. Include clear comments where to plug real tick data.

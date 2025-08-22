@@ -1,0 +1,15 @@
+We need a rigorous risk sizing module for leveraged crypto arbitrage including Kelly optimization under model uncertainty and drawdown constraints. Produce:
+
+A) LaTeX block that:
+   - Define the classical Kelly criterion and derive optimal fraction for repeated independent bets. Discuss assumptions and failure modes under estimation error.
+   - Derive drawdown-constrained Kelly as a convex optimization (or fractional programming) problem; provide transforms to solve numerically.
+   - Present tail-risk measures: VaR, CVaR, and EVT (Pickands–Balkema–de Haan theorem); explain how to estimate tail index with POT method.
+   - Give robustification techniques (shrinkage, fractional Kelly, distributionally robust optimization) and theoretical bounds on ruin probability.
+
+B) Colab-ready Python block that:
+   - Implements classical Kelly for synthetic return distributions and shows sensitivity to parameter error (Monte Carlo).
+   - Implements a drawdown-constrained optimizer (cvxpy optional; if using, include pip install cvxpy in a cell) and compares to fractional Kelly.
+   - Implements a POT EVT estimator for tails and computes CVaR.
+   - Unit tests: verify that fractional Kelly reduces ruin probability in heavy-tailed simulations versus full Kelly.
+
+Make sure to include reproducible seeds and comments on how to feed realized P&L distributions from backtests.
