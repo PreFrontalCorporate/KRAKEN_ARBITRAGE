@@ -1,0 +1,99 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+\begin{document}
+
+\title{A Unified Transaction Cost Model for Cross-Venue Cryptocurrency Trading}
+\author{Kraken Arbitrage Agent}
+\date{\today}
+\maketitle
+
+\section{Introduction}
+This document details a comprehensive transaction cost model (TCM) designed for cross-venue cryptocurrency trading, encompassing both Centralized Exchanges (CEXs) and Decentralized Exchanges (DEXs). The model aims to provide a rigorous framework for quantifying all relevant costs, enabling sophisticated arbitrage algorithms and optimal trade execution routers.
+
+\section{Formal Definition of Cost Primitives}
+
+\subsection{Centralized Exchange (CEX) Costs}
+\begin{itemize}
+    \item \textbf{Maker/Taker Fees ($\tau_m, \tau_t$):} For a trade of quantity $q$ at price $P$ and 30-day volume $V_{30}$, the fee is:
+    $$C_{trade}(q, P, V_{30}) = q \cdot P \cdot \tau(V_{30})$$
+    where $\tau(V_{30}) \in \{\tau_m(V_{30}), \tau_t(V_{30})\}$ and $\tau_m \le \tau_t$.
+
+    \item \textbf{Withdrawal/Deposit Fees ($F_W, F_D$):} The cost to transfer asset $A$ is a fixed amount:
+    $$C_{transfer}(A) = F_W(A) + F_D(A)$$
+    Typically, $F_D(A) = 0$.
+
+    \item \textbf{Bid-Ask Spread ($S_{ba}$):} The implicit cost, defined as the difference between the best ask ($P_a$) and best bid ($P_b$) prices:
+    $$S_{ba} = P_a - P_b$$
+    The proportional spread is:
+    $$S_{ba}^{\%} = \frac{P_a - P_b}{P_{mid}}$$
+    where $P_{mid} = (P_a + P_b)/2$.
+\end{itemize}
+
+\subsection{Decentralized Exchange (DEX) Costs}
+\begin{itemize}
+    \item \textbf{Gas Fees ($G$) under EIP-1559:} The total network fee is:
+    $$G = (g_{base, t} + g_{priority}) \cdot g_{units} \cdot P_{native}$$
+    where $g_{base, t}$ is the stochastic base fee, $g_{priority}$ is the user tip, $g_{units}$ is the computational work, and $P_{native}$ is the native asset's price.
+
+    \item \textbf{Slippage ($S_p$) in AMMs:}  Slippage is the difference between the expected output at the pre-trade price and the actual output received.  For a Constant Product AMM ($x \cdot y = k$), swapping $\Delta x$ of $X$ for $\Delta y$ of $Y$ with initial reserves $(x_0, y_0)$, protocol fee $\tau_p$, and $\gamma = 1 - \tau_p$:
+    $$ \Delta y = \frac{y_0 \gamma \Delta x}{x_0 + \gamma \Delta x} $$
+    Slippage at initial price $P_0 = y_0/x_0$ is:
+    $$ S_p = P_0 \Delta x \left(1 - \frac{\gamma x_0}{x_0 + \gamma \Delta x}\right) $$
+
+    \item \textbf{Oracle Risk ($\mathcal{O}$):} Modeled as expected loss:
+    $$\mathbb{E}[\mathcal{O}] = p_{manip} \cdot L_{manip}$$
+\end{itemize}
+
+\subsection{Financing Costs for Leverage}
+\begin{itemize}
+    \item \textbf{Funding Rate ($\phi$):} Cost for a position with notional $N$:
+    $$C_{fund} = N \cdot \phi$$
+
+    \item \textbf{Borrow Rate ($r_b$):} Cost to borrow $B$ for time $T$:
+    $$C_{borrow} = B \cdot r_b \cdot T$$
+\end{itemize}
+
+\section{Integration into Trading Frameworks}
+
+\subsection{Arbitrage Inequality with Frictions}
+Profit, $\Pi(q)$, from buying $q$ on CEX A ($P_A$) and selling on DEX B ($P_B$) is:
+$$ \Pi(q) = q P_B(1 - \tau_{p,B}) - S_{p,B}(q) - q P_A(1 + \tau_{t,A}) - F_{W,A} - G $$
+Arbitrage exists if $\Pi(q) > 0$.
+
+\subsection{Expected Utility Maximization}
+Maximize expected utility $U(W_1)$ with initial wealth $W_0$, returns $\mathbf{R}$, and costs $C(\Delta \mathbf{w})$:
+$$ \max_{\mathbf{w}_{new}} \mathbb{E}[U(W_1)] \quad \text{s.t.} \quad W_1 = W_0 (1 + \mathbf{w}_{new}^T \mathbf{R}) - C(\mathbf{w}_{new} - \mathbf{w}_{old}) $$
+
+\section{Optimal Routing and Compound Cost Function}
+
+\subsection{Compound Cost Function}
+Minimize total cost $C(\mathbf{x})$ for order size $X$ across venues $\mathbf{x} = [x_1, \dots, x_{m+n}]$:
+$$ \min_{\mathbf{x}} C(\mathbf{x}) = \sum_{i=1}^{m} C_{CEX,i}(x_i) + \sum_{j=1}^{n} C_{DEX,j}(x_j) $$
+subject to $\sum x_k = X$ and $x_k \ge 0$.  Component costs are:
+$$C_{CEX,i}(x_i) = x_i P_i \tau_{t,i} + S_{ba,i}(x_i)$$
+$$ C_{DEX,j}(x_j) = \mathbb{E}[G_j] \cdot \mathbb{I}(x_j > 0) + x_j P_j \tau_{p,j} + S_{p,j}(x_j) + \mathcal{O}_j $$
+
+\subsection{Convexity and Optimization Properties}
+Convexity depends on component functions. Fixed costs (e.g., gas) introduce non-convexity.
+
+\section{Calibration and Stability Analysis}
+
+\subsection{Calibration Procedures}
+\begin{itemize}
+    \item \textbf{Empirical Estimation:} Direct measurement.
+    \item \textbf{Maximum-Likelihood Estimation (MLE):} For stable parameters.
+    \item \textbf{Bootstrapping:} For stochastic parameters (e.g., funding rates, gas).
+\end{itemize}
+
+\subsection{Statistical Tests for Cost Stability}
+\begin{itemize}
+    \item \textbf{Stationarity Tests:} ADF, KPSS.
+    \item \textbf{Structural Break Tests:} Chow, QLR, CUSUM.
+\end{itemize}
+
+\end{document}

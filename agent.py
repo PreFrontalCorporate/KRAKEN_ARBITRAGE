@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Gemini-powered Research & Development Agent
+# Gemini-powered Persistent Research & Development Agent
 
 import google.generativeai as genai
 import subprocess
@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 
 # --- Configuration ---
 CONTEXT_IGNORE = {".git", ".venv", "node_modules", "__pycache__", ".agent"}
-MAX_PASSES = 10
+# MAX_PASSES has been removed for infinite persistence.
 IS_VERBOSE = os.environ.get("AGENT_VERBOSE", "0") == "1"
 
 # --- Constants ---
@@ -25,9 +25,8 @@ LOCK_FILE = STATE_DIR / "run.lock"
 # --- Setup ---
 os.makedirs(REPORTS_DIR, exist_ok=True)
 if LOCK_FILE.exists():
-    print(f"🛑 Lock file {LOCK_FILE} exists. Another agent might be running.")
-    sys.exit(1)
-LOCK_FILE.touch()
+    print("WARNING: Stale lock file found. It will be removed.")
+    LOCK_FILE.unlink()
 
 # --- Logging ---
 log_file_path = REPORTS_DIR / f"{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.log"
@@ -64,22 +63,16 @@ def run_command(command, check=True):
         return False, str(e)
 
 def run_notebook_and_generate_pdf(notebook_path: Path):
-    """
-    Executes a Jupyter notebook and, on success, converts it to a PDF report.
-    This function is our primary "test gate".
-    """
     log(f"🧪 Running test gate for notebook: {notebook_path}...")
     if not notebook_path.exists():
         log(f"❌ Notebook not found at {notebook_path}")
         return False, "Notebook file was not created by the model."
 
-    # 1. Install necessary notebook execution libraries
     log("  | Installing notebook dependencies...")
     ok, _ = run_command([sys.executable, "-m", "pip", "install", "nbconvert", "jupyter", "matplotlib", "ipykernel", "pandas", "numpy", "scipy", "cvxpy", "sortedcontainers", "stable-baselines3", "shimmy"])
     if not ok:
         return False, "Failed to install notebook dependencies."
 
-    # 2. Execute the notebook in place, checking for errors.
     output_notebook_path = notebook_path.with_suffix(".executed.ipynb")
     log(f"  | Executing notebook, output at {output_notebook_path}...")
     execute_command = [
@@ -89,36 +82,31 @@ def run_notebook_and_generate_pdf(notebook_path: Path):
         f"--output={output_notebook_path.name}",
         str(notebook_path)
     ]
-    ok, result_log = run_command(execute_command, check=False) # check=False to capture errors
+    ok, result_log = run_command(execute_command, check=False)
 
     if not ok or "Traceback" in result_log or "Error" in result_log:
         log(f"❌ Notebook execution failed. See logs for traceback.")
-        # Provide the error back to the model
         return False, f"Notebook execution failed with the following error:\n---\n{result_log}\n---"
 
     log("🟢 Notebook execution GREEN.")
 
-    # 3. Generate PDF report from the executed notebook.
     report_name = f"{notebook_path.stem}__{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
     report_path = notebook_path.parent / report_name
     log(f"  | Generating PDF report at {report_path}...")
     
-    # We use a two-step process (ipynb -> latex -> pdf) for better control and debugging
     ok, result_log = run_command(["jupyter", "nbconvert", "--to", "latex", str(output_notebook_path)])
     if not ok:
         log("❌ PDF generation failed at LaTeX conversion step.")
         return False, f"Failed to convert notebook to LaTeX:\n---\n{result_log}\n---"
 
     latex_file = output_notebook_path.with_suffix(".tex")
-    # Run twice for references/toc
-    run_command(["pdflatex", "-interaction=nonstopmode", str(latex_file)])
+    run_command(["pdflatex", "-interaction=nonstopmode", str(latex_file)], check=False)
     ok, result_log = run_command(["pdflatex", "-interaction=nonstopmode", str(latex_file)])
 
     if not ok or not output_notebook_path.with_suffix(".pdf").exists():
          log("❌ PDF generation failed at pdflatex compilation step.")
          return False, f"pdflatex command failed:\n---\n{result_log}\n---"
 
-    # Rename the final PDF
     output_notebook_path.with_suffix(".pdf").rename(report_path)
     log(f"✅ Report generated: {report_path}")
     return True, report_path.name
@@ -127,7 +115,6 @@ def run_notebook_and_generate_pdf(notebook_path: Path):
 def get_repo_context(target_dir):
     log(f"🔍 Building repository context for '{target_dir}'...")
     context = []
-    # Scan all files within the target directory
     base_path = Path(target_dir)
     if not base_path.exists() or not base_path.is_dir():
         log(f"⚠️ Target directory '{target_dir}' does not exist. Context will be empty.")
@@ -136,7 +123,7 @@ def get_repo_context(target_dir):
     files_to_scan = [p for p in base_path.rglob("*") if p.is_file() and not any(part in CONTEXT_IGNORE for part in p.parts)]
     for p in files_to_scan:
         try:
-            rel_path = p.relative_to(Path.cwd())
+            rel_path = p.resolve().relative_to(Path.cwd().resolve())
             context.append(f"----\n📄 {rel_path}\n----\n{p.read_text(encoding='utf-8', errors='ignore')}")
         except Exception as e:
             context.append(f"----\n📄 {p.relative_to(Path.cwd())}\n----\n(could not read file: {e})")
@@ -224,6 +211,11 @@ def run_pass(user_prompt, memory, target_dir):
         return None
 
 def main():
+    if LOCK_FILE.exists():
+        log(f"🛑 Lock file {LOCK_FILE} exists. Another agent might be running.")
+        sys.exit(1)
+    LOCK_FILE.touch()
+
     log("🚀 Agent starting...")
 
     env_path = Path(".agent/agent.env")
@@ -234,12 +226,14 @@ def main():
     api_key = os.environ.get("GOOGLE_API_KEY")
     if not api_key:
         log("❌ FATAL: GOOGLE_API_KEY not found in .agent/agent.env")
+        LOCK_FILE.unlink()
         sys.exit(1)
     genai.configure(api_key=api_key)
     log("✅ Gemini API key configured.")
 
     if len(sys.argv) < 3:
-        log("❌ FATAL: Insufficient arguments. Usage: python agent.py \"<user_prompt_file.txt>\" <target_directory>")
+        log("❌ FATAL: Insufficient arguments. Usage: python agent.py \"<prompt_file.txt>\" <target_directory>")
+        LOCK_FILE.unlink()
         sys.exit(1)
 
     user_prompt_file = Path(sys.argv[1])
@@ -247,15 +241,18 @@ def main():
 
     if not user_prompt_file.exists():
         log(f"❌ FATAL: Prompt file not found: {user_prompt_file}")
+        LOCK_FILE.unlink()
         sys.exit(1)
     user_prompt = user_prompt_file.read_text()
     log(f"✅ Loaded prompt from {user_prompt_file}")
 
     pass_count = 0
     memory_string = ""
-    while pass_count < MAX_PASSES:
+    # --- THIS IS THE CHANGE ---
+    # The agent will now loop forever until it succeeds.
+    while True:
         pass_count += 1
-        log(f"--- 🔁 Starting Pass {pass_count}/{MAX_PASSES} ---")
+        log(f"--- 🔁 Starting Pass {pass_count} ---")
 
         response = run_pass(user_prompt, memory_string, target_dir)
         if not response:
@@ -274,7 +271,6 @@ def main():
             memory_string = f"## Memory\nThe last attempt failed with a critical file write error: '{message}'. This is an environment issue. Please state this in your summary and do not provide an EDIT block."
             continue
 
-        # Find the notebook to test
         notebook_to_test = next((f for f in edited_files if f.suffix == '.ipynb'), None)
 
         if not notebook_to_test:
@@ -290,15 +286,12 @@ def main():
             commit_message = f"feat({target_dir}): Complete research module via agent\n\n{processed_data['summary']}"
             run_command(["git", "commit", "-m", commit_message])
             log("Changes committed. You can now 'git push' to save to remote.")
-            break
+            break # Exit the infinite loop on success
         else:
             log(f"❌ Test gate failed. Reverting changes and preparing for the next attempt.")
             run_command(["git", "reset", "--hard", "HEAD"], check=False)
             run_command(["git", "clean", "-fd"], check=False)
             memory_string = f"## Memory\nYour last code edit was correctly applied, but the test gate failed. The notebook produced an error during execution. Please analyze the error, fix the code, and try again.\n\nFAILED TEST LOG:\n{test_result}"
-
-    if pass_count >= MAX_PASSES:
-        log(f"❌ Max passes ({MAX_PASSES}) reached. Agent stopping.")
 
     log("🛑 Agent shutting down.")
     LOCK_FILE.unlink()
