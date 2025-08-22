@@ -19,23 +19,22 @@
 
 \begin{itemize}
     \item \textbf{Order:} A tuple $O = (\epsilon_o, p_o, v_o, \tau_o)$, where $\epsilon_o \in \{+1, -1\}$ (buy/sell), $p_o \in \mathbb{R}^+$ is the price, $v_o \in \mathbb{Z}^+$ is the volume, and $\tau_o \in \mathbb{R}^+$ is the timestamp.
-    \item \textbf{Limit Order:} An order to buy/sell a quantity at a specified price or better.  It rests in the LOB until executed or cancelled.
+    \item \textbf{Limit Order:} An order to buy/sell a quantity at a specified price or better. It rests in the LOB until executed or cancelled.
     \item \textbf{Market Order:} An order to buy/sell a quantity immediately at the best available price(s).
-    \item \textbf{Tick:} The minimum price increment allowed by the exchange.
+    \item \textbf{Tick Size ($\theta$):} The minimum price increment allowed by the exchange.
     \item \textbf{Queue Position:} An order's rank in the FIFO queue at a given price level.
-    \item \textbf{Liquidity:}  Characterized by tightness (spread), depth (volume at price levels), and resiliency (recovery speed).
+    \item \textbf{Liquidity:} Characterized by tightness (spread), depth (volume at price levels), and resiliency (recovery speed).
     \item \textbf{Mid-Price:} $M(t) = \frac{P_a(t) + P_b(t)}{2}$, where $P_a(t)$ is the best ask and $P_b(t)$ is the best bid.
-    \item \textbf{Microstructure Noise:}  Deviations of the observed price from the efficient price due to discrete trading mechanics.
+    \item \textbf{Microstructure Noise:} Deviations of the observed price from the efficient price due to discrete trading mechanics.
 \end{itemize}
-
 
 \section{Stochastic Modeling of LOB Event Flows}
 
 \subsection{Order Arrivals}
 
 \begin{itemize}
-    \item \textbf{Poisson Process:}  Constant intensity $\lambda(t) = \lambda$. Inter-arrival times are exponentially distributed.
-    \item \textbf{Hawkes Process:} Self-exciting process. Intensity $\lambda(t) = \mu + \sum_{t_i < t} g(t - t_i)$.  Exponential kernel: $g(t) = \alpha e^{-\beta t}$. Stationarity: $\frac{\alpha}{\beta} < 1$.
+    \item \textbf{Poisson Process:} Constant intensity $\lambda(t) = \lambda$. Inter-arrival times are exponentially distributed.  $P(N(t) = k) = \frac{(\lambda t)^k e^{-\lambda t}}{k!}$.
+    \item \textbf{Hawkes Process:} Self-exciting process. Intensity $\lambda(t) = \mu + \sum_{t_i < t} g(t - t_i)$. Exponential kernel: $g(t) = \alpha e^{-\beta t}$. Stationarity condition: $\frac{\alpha}{\beta} < 1$.
 \end{itemize}
 
 \subsection{Cancellations}
@@ -49,12 +48,11 @@ Modeled by a hazard rate $\lambda_c(t, O, LOB_t)$ dependent on order characteris
     \item \textbf{Square-root:} $I(Q) \propto \sqrt{Q}$ (large trades).
 \end{itemize}
 
-
 \section{Optimal Execution: Almgren-Chriss}
 
 \subsection{Problem Statement}
 
-Minimize expected cost $E[C]$ plus variance penalty $\lambda V[C]$.
+Minimize expected cost $E[C]$ plus variance penalty $\lambda V[C]$, where $C$ is the implementation shortfall and $\lambda$ is the risk aversion.
 
 \subsection{Market Impact Model}
 
@@ -67,26 +65,24 @@ Minimize expected cost $E[C]$ plus variance penalty $\lambda V[C]$.
 
 $x(t) = X_0 \frac{\sinh(\kappa(T-t))}{\sinh(\kappa T)}$, where $\kappa = \sqrt{\frac{\lambda \sigma^2}{\eta}}$.
 
-
 \section{Simulator Design and Validation}
 
 \subsection{Deliverables}
 
 \begin{itemize}
-    \item LimitOrderBook class.
+    \item \texttt{LimitOrderBook} class.
     \item Event generators (Poisson, Hawkes).
     \item Simulation engine.
-    \item Metrics and outputs.
+    \item Metrics and outputs (mid-price, slippage).
 \end{itemize}
 
 \subsection{Unit Tests}
 
 \begin{enumerate}
-    \item Volume Conservation.
-    \item Price-Time Priority.
-    \item Impact Scaling.
-    \item Hawkes Clustering.
+    \item \textbf{Volume Conservation:} Verify total traded volume equals market order size.
+    \item \textbf{Price-Time Priority:}  Confirm execution against best price levels first, then FIFO within each level.
+    \item \textbf{Impact Scaling:} Check if slippage scales linearly for small trades.
+    \item \textbf{Hawkes Clustering:} Ensure Hawkes process generates clustered events (higher variance of inter-arrival times than Poisson).
 \end{enumerate}
-
 
 \end{document}
