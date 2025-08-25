@@ -1,0 +1,57 @@
+2025-08-25 01:18:13,474 - INFO - 🔒 Live Kraken API Initialized.
+2025-08-25 01:18:13,475 - INFO - Fetching all tradable pairs from Kraken...
+2025-08-25 01:18:19,100 - INFO - ⚙️ Engine initialized in LIVE mode. Monitoring 20 pairs.
+2025-08-25 01:18:19,100 - INFO - 
+--- ✅ Live Engine Started ---
+2025-08-25 01:18:19,245 - INFO - [State] Current Cash Balance: $10.00
+2025-08-25 01:18:24,433 - INFO - --- Analyzing XETHZUSD | Price: $4,746.7600 | RSI: 21.59 ---
+2025-08-25 01:18:24,433 - WARNING -   [SIGNAL] BUY (Oversold) DETECTED for XETHZUSD
+2025-08-25 01:18:24,434 - INFO -   [SIZING] Skipping trade. Capital $1.00 is below minimum $5.00
+2025-08-25 01:18:27,781 - INFO - --- Analyzing XXBTZUSD | Price: $115,087.4000 | RSI: 24.08 ---
+2025-08-25 01:18:27,781 - WARNING -   [SIGNAL] BUY (Oversold) DETECTED for XXBTZUSD
+2025-08-25 01:18:27,782 - INFO -   [SIZING] Skipping trade. Capital $1.00 is below minimum $5.00
+2025-08-25 01:18:30,970 - INFO - --- Analyzing XXRPZUSD | Price: $3.0320 | RSI: 26.55 ---
+2025-08-25 01:18:30,971 - WARNING -   [SIGNAL] BUY (Oversold) DETECTED for XXRPZUSD
+2025-08-25 01:18:30,971 - INFO -   [SIZING] Skipping trade. Capital $1.00 is below minimum $5.00
+2025-08-25 01:18:34,222 - INFO - --- Analyzing SOLUSD | Price: $203.8400 | RSI: 26.14 ---
+2025-08-25 01:18:34,222 - WARNING -   [SIGNAL] BUY (Oversold) DETECTED for SOLUSD
+2025-08-25 01:18:34,222 - INFO -   [SIZING] Skipping trade. Capital $1.00 is below minimum $5.00
+2025-08-25 01:18:37,711 - INFO - --- Analyzing XDGUSD | Price: $0.2350 | RSI: 24.77 ---
+2025-08-25 01:18:37,711 - WARNING -   [SIGNAL] BUY (Oversold) DETECTED for XDGUSD
+2025-08-25 01:18:37,711 - INFO -   [SIZING] Skipping trade. Capital $1.00 is below minimum $5.00
+2025-08-25 01:18:40,972 - INFO - --- Analyzing ADAUSD | Price: $0.9107 | RSI: 28.78 ---
+2025-08-25 01:18:40,972 - WARNING -   [SIGNAL] BUY (Oversold) DETECTED for ADAUSD
+2025-08-25 01:18:40,973 - INFO -   [SIZING] Skipping trade. Capital $1.00 is below minimum $5.00
+2025-08-25 01:18:44,161 - INFO - --- Analyzing LINKUSD | Price: $26.1497 | RSI: 36.59 ---
+2025-08-25 01:18:47,546 - INFO - --- Analyzing ZEURZUSD | Price: $1.1775 | RSI: 36.19 ---
+2025-08-25 01:18:50,708 - INFO - --- Analyzing SUIUSD | Price: $3.7231 | RSI: 29.53 ---
+2025-08-25 01:18:50,708 - WARNING -   [SIGNAL] BUY (Oversold) DETECTED for SUIUSD
+2025-08-25 01:18:50,708 - INFO -   [SIZING] Skipping trade. Capital $1.00 is below minimum $5.00
+2025-08-25 01:18:54,040 - INFO - --- Analyzing AVAXUSD | Price: $25.7600 | RSI: 25.53 ---
+2025-08-25 01:18:54,040 - WARNING -   [SIGNAL] BUY (Oversold) DETECTED for AVAXUSD
+2025-08-25 01:18:54,041 - INFO -   [SIZING] Skipping trade. Capital $1.00 is below minimum $5.00
+2025-08-25 01:18:57,211 - INFO - --- Analyzing FARTCOINUSD | Price: $0.9454 | RSI: 25.61 ---
+2025-08-25 01:18:57,211 - WARNING -   [SIGNAL] BUY (Oversold) DETECTED for FARTCOINUSD
+2025-08-25 01:18:57,211 - INFO -   [SIZING] Skipping trade. Capital $1.00 is below minimum $5.00
+2025-08-25 01:19:00,386 - INFO - --- Analyzing TAOUSD | Price: $362.8135 | RSI: 31.23 ---
+2025-08-25 01:19:03,611 - INFO - --- Analyzing ENAUSD | Price: $0.7382 | RSI: 40.00 ---
+2025-08-25 01:19:06,865 - INFO - --- Analyzing PROMPTUSD | Price: $0.2400 | RSI: 56.47 ---
+2025-08-25 01:19:10,196 - INFO - --- Analyzing BONKUSD | Price: $0.0000 | RSI: 36.55 ---
+2025-08-25 01:19:13,379 - INFO - --- Analyzing PENGUUSD | Price: $0.0359 | RSI: 33.44 ---
+2025-08-25 01:19:16,749 - INFO - --- Analyzing BIOUSD | Price: $0.2347 | RSI: 42.78 ---
+2025-08-25 01:19:19,916 - INFO - --- Analyzing XLTCZUSD | Price: $120.7600 | RSI: 21.62 ---
+2025-08-25 01:19:19,916 - WARNING -   [SIGNAL] BUY (Oversold) DETECTED for XLTCZUSD
+2025-08-25 01:19:19,916 - INFO -   [SIZING] Skipping trade. Capital $1.00 is below minimum $5.00
+2025-08-25 01:19:23,076 - INFO - --- Analyzing PUMPUSD | Price: $0.0032 | RSI: 50.30 ---
+2025-08-25 01:19:26,332 - INFO - --- Analyzing ARBUSD | Price: $0.5947 | RSI: 25.28 ---
+2025-08-25 01:19:26,332 - WARNING -   [SIGNAL] BUY (Oversold) DETECTED for ARBUSD
+2025-08-25 01:19:26,332 - INFO -   [SIZING] Skipping trade. Capital $1.00 is below minimum $5.00
+2025-08-25 01:19:29,335 - INFO - 
+--- Cycle complete. Sleeping for 5 minutes. ---
+2025-08-25 01:24:29,713 - INFO - [State] Current Cash Balance: $10.00
+2025-08-25 01:24:29,957 - INFO - --- Analyzing XETHZUSD | Price: $4,746.7600 | RSI: 21.59 ---
+2025-08-25 01:24:29,957 - WARNING -   [SIGNAL] BUY (Oversold) DETECTED for XETHZUSD
+2025-08-25 01:24:29,957 - INFO -   [SIZING] Skipping trade. Capital $1.00 is below minimum $5.00
+2025-08-25 01:24:33,253 - INFO - --- Analyzing XXBTZUSD | Price: $115,087.4000 | RSI: 24.08 ---
+2025-08-25 01:24:33,253 - WARNING -   [SIGNAL] BUY (Oversold) DETECTED for XXBTZUSD
+2025-08-25 01:24:33,253 - INFO -   [SIZING] Skipping trade. Capital $1.00 is below minimum $5.00

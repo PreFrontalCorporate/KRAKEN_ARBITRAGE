@@ -8,83 +8,118 @@ from pykrakenapi import KrakenAPI
 from pathlib import Path
 from dotenv import load_dotenv
 import logging
+from logging.handlers import TimedRotatingFileHandler
 
-# --- Configuration ---
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', filename='unified_engine.log', filemode='w')
-logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
-
-# --- Path Setup ---
+# --- Path Setup & Logging ---
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.append(str(PROJECT_ROOT))
+COMMAND_FILE = PROJECT_ROOT / 'command.txt'
+LOGS_DIR = PROJECT_ROOT / 'logs'
+LOGS_DIR.mkdir(exist_ok=True)
+log_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+log_handler = TimedRotatingFileHandler(LOGS_DIR / "engine.log", when="midnight", interval=1, backupCount=30)
+log_handler.setFormatter(log_formatter)
+log_handler.suffix = "%Y-%m-%d"
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+if logger.hasHandlers():
+    logger.handlers.clear()
+logger.addHandler(log_handler)
+logger.addHandler(logging.StreamHandler(sys.stdout))
 
-# --- Live Kraken Data Connection ---
-class KrakenConnection:
-    def __init__(self, api_key, private_key):
+# --- Module Imports ---
+from Execution_Engine_Skeleton.execution_engine import OrderSide, OrderType
+from Risk_Sizing_Kelly_Tail_Risk.kelly_optimization import KellySizer
+
+# --- Live Kraken Execution Engine ---
+class LiveExecutionEngine:
+    def __init__(self, api_key, private_key, dry_run=True):
+        self.dry_run = dry_run
         try:
             self.api = krakenex.API(api_key, private_key)
             self.kraken = KrakenAPI(self.api)
-            logging.info("✅ Kraken API connection successful.")
+            logging.info(f"✅ Kraken API connection successful. Dry Run: {self.dry_run}")
         except Exception as e:
             logging.error(f"❌ Failed to initialize Kraken API: {e}")
             self.kraken = None
 
-    def get_tradable_asset_pairs(self, top_n_by_volume=50):
-        """Fetches all tradable asset pairs and filters for the top N by 24h volume."""
-        if not self.kraken: return []
+    def get_account_balance(self):
+        if not self.kraken: return {}
+        if self.dry_run:
+            return {'ZUSD': 2.26, 'PROMPT': 21.993}
         try:
-            logging.info("Fetching all tradable pairs from Kraken...")
+            balance = self.kraken.get_account_balance()
+            return {asset: qty for asset, qty in balance['vol'].items() if qty > 1e-8}
+        except Exception as e:
+            logging.error(f"Could not get account balance: {e}")
+            return {}
+
+    def get_ticker_info(self, pair_csv):
+        if not self.kraken: return None
+        try:
+            return self.kraken.get_ticker_information(pair_csv)
+        except Exception as e: return None
+
+    def get_tradable_asset_pairs(self, top_n_by_volume=50):
+        if not self.kraken: return ['XBTUSD', 'ETHUSD', 'SOLUSD']
+        try:
             all_pairs = self.kraken.get_tradable_asset_pairs()
-
-            # Filter for pairs ending in USD, excluding leveraged tokens and stablecoins
+            ignore_list = ['DAI', 'USDT', 'USDC', 'USDG', 'ZEUR', 'ZGBP', 'AUD']
+            ignore_pattern = '|'.join(ignore_list)
             usd_pairs = all_pairs[all_pairs.index.str.upper().str.endswith('USD')]
-            usd_pairs = usd_pairs[~usd_pairs.index.str.upper().str.contains('DAI|USDT|USDC')]
-            usd_pairs = usd_pairs[~usd_pairs.index.str.contains(r'\d[LPS]$')] # Regex for 2L, 3S etc.
-
+            usd_pairs = usd_pairs[~usd_pairs.index.str.upper().str.contains(ignore_pattern)]
             pair_list = list(usd_pairs.index)
-            logging.info(f"Found {len(pair_list)} USD pairs. Fetching ticker data for volume...")
-
-            # Fetch ticker info in batches to get volume
             ticker_info = self.kraken.get_ticker_information(','.join(pair_list))
-
             volume_data = []
             for pair, data in ticker_info.iterrows():
                 volume_in_quote_currency = float(data['v'][1]) * float(data['p'][1])
                 volume_data.append({'pair': pair, 'volume_usd': volume_in_quote_currency})
-
             volume_df = pd.DataFrame(volume_data).set_index('pair')
-
-            # Sort by volume and return the top N
             top_pairs = volume_df.sort_values(by='volume_usd', ascending=False).head(top_n_by_volume)
-            logging.info(f"Dynamically selected Top {top_n_by_volume} pairs by 24h volume.")
             return list(top_pairs.index)
-
         except Exception as e:
-            logging.error(f"❌ Could not dynamically fetch asset pairs: {e}", exc_info=True)
-            return ['XBTUSD', 'ETHUSD', 'SOLUSD'] # Fallback list
+            logging.error(f"Could not dynamically fetch asset pairs: {e}", exc_info=True)
+            return ['XBTUSD', 'ETHUSD', 'SOLUSD']
 
     def get_historical_data(self, pair, interval, since):
         if not self.kraken: return None
         try:
             ohlc, _ = self.kraken.get_ohlc_data(pair, interval, since)
             return ohlc
+        except Exception as e: return None
+
+    def place_order(self, pair, side: OrderSide, order_type: OrderType, amount, price=None):
+        logging.info(f"--- Placing Order ---")
+        logging.info(f"  Pair: {pair}, Side: {side.name}, Type: {order_type.name}, Amount: {amount:.8f}")
+        if self.dry_run:
+            logging.warning(f"[DRY RUN] Order would be placed.")
+            return f"DRYRUN_{int(time.time())}"
+        try:
+            response = self.kraken.add_standard_order(
+                pair=pair, type=side.name.lower(), ordertype=order_type.name.lower(),
+                volume=f"{amount:.8f}", validate=False
+            )
+            txid = response['txid'][0]
+            logging.info(f"✅✅✅ LIVE ORDER PLACED: {txid} ✅✅✅")
+            return txid
         except Exception as e:
-            logging.error(f"❌ Could not fetch historical data for {pair}: {e}")
+            logging.error(f"❌❌❌ LIVE ORDER FAILED: {e} ❌❌❌")
             return None
 
 # --- Main Engine ---
 class UnifiedEngine:
-    def __init__(self):
-        logging.info("🚀 Initializing Dynamic All-Coins Engine...")
+    def __init__(self, mode='live'):
+        self.mode = mode
+        self.state = "RUNNING"
         self._load_env()
-        self.connection = KrakenConnection(self.kraken_api_key, self.kraken_private_key)
-        # THIS IS THE CHANGE: It now requests the Top 50
-        self.trading_pairs = self.connection.get_tradable_asset_pairs(top_n_by_volume=50)
-        if not self.trading_pairs:
-            logging.error("❌ FATAL: Could not retrieve any tradable pairs. Exiting.")
-            sys.exit(1)
 
-        self.positions = {pair: 0 for pair in self.trading_pairs}
-        logging.info(f"⚙️ Engine initialized. Monitoring {len(self.trading_pairs)} pairs: {self.trading_pairs}")
+        self.execution_engine = LiveExecutionEngine(
+            self.kraken_api_key, self.kraken_private_key, dry_run=(self.mode != 'live')
+        )
+        self.risk_sizer = KellySizer()
+        self.trading_pairs = self.execution_engine.get_tradable_asset_pairs()
+        self.portfolio = {}
+        logging.info(f"⚙️ Engine initialized in {self.mode.upper()} mode. Monitoring {len(self.trading_pairs)} pairs.")
 
     def _load_env(self):
         env_path = PROJECT_ROOT / '.agent' / 'agent.env'
@@ -96,55 +131,117 @@ class UnifiedEngine:
         delta = series.diff()
         gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
-        if loss.iloc[-1] == 0: return 100
+        if loss.empty or loss.iloc[-1] == 0: return 100
         rs = gain / loss
         return 100 - (100 / (1 + rs))
 
-    def run_weekend_dry_run(self, rsi_period=14, overbought=70, oversold=30):
-        logging.info(f"\n--- 🌵 Starting Weekend Dry Run for TOP 50 COINS ---")
-        logging.warning("This will run indefinitely. To stop, use 'kill <PID>'.")
+    def _update_portfolio_value(self):
+        self.portfolio = {'total_value_usd': 0, 'cash_usd': 0, 'positions': {}}
+        balance = self.execution_engine.get_account_balance()
+        if not balance:
+            logging.error("Could not retrieve account balance.")
+            return
+
+        pairs_to_query = []
+        for asset, qty in balance.items():
+            asset_clean = asset.replace('X', '').replace('Z', '')
+            if 'USD' in asset_clean:
+                self.portfolio['cash_usd'] += qty
+            elif qty > 0:
+                pair = asset_clean + 'USD'
+                if pair in self.trading_pairs:
+                    pairs_to_query.append(pair)
+
+        if pairs_to_query:
+            # Fetch all tickers at once for efficiency
+            tickers = self.execution_engine.get_ticker_info(','.join(pairs_to_query))
+            if tickers is not None:
+                for pair in pairs_to_query:
+                    asset_name = pair.replace('USD', '')
+                    original_asset = next((a for a in balance.keys() if asset_name in a.replace('X','').replace('Z','')), None)
+                    if original_asset:
+                        qty = balance[original_asset]
+                        price = float(tickers.loc[pair]['c'][0])
+                        value = qty * price
+                        self.portfolio['total_value_usd'] += value
+                        self.portfolio['positions'][pair] = {'qty': qty, 'value': value}
+
+        self.portfolio['total_value_usd'] += self.portfolio['cash_usd']
+
+    def run_live_trading(self, rsi_period=14, oversold=30, overbought=65, min_trade_usd=5.0):
+        logging.info(f"\n--- ✅ Live Portfolio Manager Started ---")
 
         while True:
             try:
-                for pair in self.trading_pairs:
-                    logging.info(f"\n--- Analyzing {pair} ---")
+                self._update_portfolio_value()
+                logging.info(f"[State] Total Portfolio Value: ${self.portfolio['total_value_usd']:.2f} | Cash: ${self.portfolio['cash_usd']:.2f}")
 
+                all_opportunities = []
+                logging.info("--- Starting market analysis cycle ---")
+                for pair in self.trading_pairs:
                     since = int(time.time()) - (rsi_period + 100) * 900
-                    data = self.connection.get_historical_data(pair, 15, since)
+                    data = self.execution_engine.get_historical_data(pair, 15, since)
                     if data is None or data.empty or len(data) < rsi_period:
-                        logging.warning(f"  [Data] Insufficient data for {pair}. Skipping.")
                         time.sleep(3)
                         continue
 
                     data['rsi'] = self._calculate_rsi(data['close'], rsi_period)
                     current_rsi = data['rsi'].iloc[-1]
-                    current_price = data['close'].iloc[-1]
+                    logging.info(f"  > Analyzed {pair}: RSI = {current_rsi:.2f}")
+                    all_opportunities.append({'pair': pair, 'rsi': current_rsi})
+                    time.sleep(3)
 
-                    logging.info(f"  [State] Current Price: ${current_price:,.4f}")
-                    logging.info(f"  [Signal] Current RSI({rsi_period}): {current_rsi:.2f}")
+                # --- REBALANCING LOGIC ---
+                assets_to_sell = []
+                for pair, position_data in self.portfolio['positions'].items():
+                    current_asset_info = next((item for item in all_opportunities if item["pair"] == pair), None)
+                    if current_asset_info and current_asset_info['rsi'] > overbought:
+                        assets_to_sell.append({'pair': pair, 'qty': position_data['qty']})
 
-                    if current_rsi < oversold and self.positions[pair] == 0:
-                        logging.warning(f"  [DRY RUN SIGNAL] BUY (Oversold) DETECTED for {pair} at ${current_price:,.4f}")
-                        self.positions[pair] = 1
+                for asset in assets_to_sell:
+                    logging.warning(f"  [REBALANCE] SELL SIGNAL for {asset['pair']}. Exiting position.")
+                    self.execution_engine.place_order(asset['pair'], OrderSide.SELL, OrderType.MARKET, asset['qty'])
+                    time.sleep(5)
 
-                    elif current_rsi > overbought and self.positions[pair] == 1:
-                        logging.warning(f"  [DRY RUN SIGNAL] SELL (Overbought) DETECTED for {pair} at ${current_price:,.4f}")
-                        self.positions[pair] = 0
+                if assets_to_sell: self._update_portfolio_value()
+                cash_to_deploy = self.portfolio['cash_usd']
+
+                buy_candidates = [opp for opp in all_opportunities if opp['rsi'] < oversold and opp['pair'] not in self.portfolio['positions']]
+                buy_candidates.sort(key=lambda x: x['rsi'])
+
+                for candidate in buy_candidates:
+                    if cash_to_deploy < min_trade_usd: break
+
+                    pair = candidate['pair']
+                    price_ticker = self.execution_engine.get_ticker_info(pair)
+                    if price_ticker is None: continue
+                    price = float(price_ticker['c'][0][0])
+
+                    kelly_fraction = self.risk_sizer.calculate_classical_kelly(p=0.55, b=1.0)
+                    trade_fraction = kelly_fraction * 0.5
+                    ideal_capital = cash_to_deploy * trade_fraction
+
+                    trade_capital = min(ideal_capital, cash_to_deploy * 0.98)
+
+                    if trade_capital >= min_trade_usd:
+                        logging.warning(f"  [REBALANCE] BUY SIGNAL for {pair} (RSI: {candidate['rsi']:.2f}).")
+                        logging.info(f"  [SIZING] Kelly Fraction: {trade_fraction:.2%}. Allocating up to ${trade_capital:.2f}.")
+                        trade_size = trade_capital / price
+                        if self.execution_engine.place_order(pair, OrderSide.BUY, OrderType.MARKET, trade_size):
+                            cash_to_deploy -= trade_capital
                     else:
-                        logging.info(f"  [Signal] No signal. RSI is neutral.")
+                        break
 
-                    time.sleep(3) # Short sleep to respect API rate limits
-
-                logging.info("\n--- Cycle complete. Sleeping for 5 minutes. ---")
-                time.sleep(5 * 60)
+                logging.info("\n--- Cycle complete. Sleeping for 10 minutes. ---")
+                time.sleep(10 * 60)
 
             except KeyboardInterrupt:
-                logging.info("\n--- Dry run stopped ---")
+                logging.info("\n--- Engine shutdown requested ---")
                 break
             except Exception as e:
                 logging.error(f"An error occurred in the main loop: {e}", exc_info=True)
                 time.sleep(60)
 
 if __name__ == "__main__":
-    engine = UnifiedEngine()
-    engine.run_weekend_dry_run()
+    engine = UnifiedEngine(mode='live')
+    engine.run_live_trading()

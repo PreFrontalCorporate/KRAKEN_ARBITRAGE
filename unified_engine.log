@@ -1,0 +1,11 @@
+2025-08-25 02:38:12,336 - INFO - 🚀 Initializing Engine in BACKTEST mode...
+2025-08-25 02:38:12,337 - INFO - ✅ Kraken API connection successful for public data.
+2025-08-25 02:38:12,337 - INFO - ⚙️ All components initialized successfully!
+2025-08-25 02:38:12,337 - INFO - 
+--- Starting Backtest for ETHUSD ---
+2025-08-25 02:38:12,952 - INFO - ✅ Fetched 720 data points for backtesting.
+2025-08-25 02:38:13,514 - INFO - 
+--- Backtest Results ---
+2025-08-25 02:38:13,515 - INFO - Total Return: 1.09%
+2025-08-25 02:38:13,515 - INFO - Sharpe Ratio: 0.53
+2025-08-25 02:38:13,515 - INFO - ------------------------
