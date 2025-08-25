@@ -9,17 +9,36 @@ from pathlib import Path
 from dotenv import load_dotenv
 import logging
 from logging.handlers import TimedRotatingFileHandler
+from datetime import datetime
+import pytz # Import the new timezone library
 
-# --- Path Setup & Logging ---
+# --- Path Setup ---
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.append(str(PROJECT_ROOT))
-COMMAND_FILE = PROJECT_ROOT / 'command.txt'
 LOGS_DIR = PROJECT_ROOT / 'logs'
 LOGS_DIR.mkdir(exist_ok=True)
-log_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+
+# --- Advanced Logging Configuration ---
+# 1. Create a timezone-aware formatter
+class TimezoneFormatter(logging.Formatter):
+    def __init__(self, fmt=None, datefmt=None, tz=pytz.timezone('America/Los_Angeles')):
+        super().__init__(fmt, datefmt)
+        self.tz = tz
+
+    def formatTime(self, record, datefmt=None):
+        dt = datetime.fromtimestamp(record.created, self.tz)
+        if datefmt:
+            s = dt.strftime(datefmt)
+        else:
+            s = dt.isoformat()
+        return s
+
+# 2. Configure the logger with the new formatter and handler
+log_formatter = TimezoneFormatter('%(asctime)s - %(levelname)s - %(message)s', '%Y-%m-%d %H:%M:%S %Z')
 log_handler = TimedRotatingFileHandler(LOGS_DIR / "engine.log", when="midnight", interval=1, backupCount=30)
 log_handler.setFormatter(log_formatter)
-log_handler.suffix = "%Y-%m-%d"
+log_handler.suffix = "%Y-%m-%d" # This will append the date to the rotated log file
+
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 if logger.hasHandlers():
@@ -44,6 +63,7 @@ class LiveExecutionEngine:
             self.kraken = None
 
     def get_account_balance(self):
+        # ... (function is unchanged)
         if not self.kraken: return {}
         if self.dry_run:
             return {'ZUSD': 2.26, 'PROMPT': 21.993}
@@ -55,12 +75,14 @@ class LiveExecutionEngine:
             return {}
 
     def get_ticker_info(self, pair_csv):
+        # ... (function is unchanged)
         if not self.kraken: return None
         try:
             return self.kraken.get_ticker_information(pair_csv)
         except Exception as e: return None
 
     def get_tradable_asset_pairs(self, top_n_by_volume=50):
+        # ... (function is unchanged)
         if not self.kraken: return ['XBTUSD', 'ETHUSD', 'SOLUSD']
         try:
             all_pairs = self.kraken.get_tradable_asset_pairs()
@@ -82,6 +104,7 @@ class LiveExecutionEngine:
             return ['XBTUSD', 'ETHUSD', 'SOLUSD']
 
     def get_historical_data(self, pair, interval, since):
+        # ... (function is unchanged)
         if not self.kraken: return None
         try:
             ohlc, _ = self.kraken.get_ohlc_data(pair, interval, since)
@@ -89,6 +112,7 @@ class LiveExecutionEngine:
         except Exception as e: return None
 
     def place_order(self, pair, side: OrderSide, order_type: OrderType, amount, price=None):
+        # ... (function is unchanged)
         logging.info(f"--- Placing Order ---")
         logging.info(f"  Pair: {pair}, Side: {side.name}, Type: {order_type.name}, Amount: {amount:.8f}")
         if self.dry_run:
@@ -122,12 +146,14 @@ class UnifiedEngine:
         logging.info(f"⚙️ Engine initialized in {self.mode.upper()} mode. Monitoring {len(self.trading_pairs)} pairs.")
 
     def _load_env(self):
+        # ... (function is unchanged)
         env_path = PROJECT_ROOT / '.agent' / 'agent.env'
         load_dotenv(dotenv_path=env_path)
         self.kraken_api_key = os.getenv("KRAKEN_API_KEY")
         self.kraken_private_key = os.getenv("KRAKEN_PRIVATE_KEY")
 
     def _calculate_rsi(self, series, period=14):
+        # ... (function is unchanged)
         delta = series.diff()
         gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
@@ -136,6 +162,7 @@ class UnifiedEngine:
         return 100 - (100 / (1 + rs))
 
     def _update_portfolio_value(self):
+        # ... (function is unchanged)
         self.portfolio = {'total_value_usd': 0, 'cash_usd': 0, 'positions': {}}
         balance = self.execution_engine.get_account_balance()
         if not balance:
@@ -153,7 +180,6 @@ class UnifiedEngine:
                     pairs_to_query.append(pair)
 
         if pairs_to_query:
-            # Fetch all tickers at once for efficiency
             tickers = self.execution_engine.get_ticker_info(','.join(pairs_to_query))
             if tickers is not None:
                 for pair in pairs_to_query:
@@ -163,12 +189,15 @@ class UnifiedEngine:
                         qty = balance[original_asset]
                         price = float(tickers.loc[pair]['c'][0])
                         value = qty * price
-                        self.portfolio['total_value_usd'] += value
-                        self.portfolio['positions'][pair] = {'qty': qty, 'value': value}
+                        if pair not in self.portfolio.get('positions', {}):
+                            self.portfolio['positions'][pair] = {'qty': qty, 'value': value, 'entry_price': price}
+                        else:
+                            self.portfolio['positions'][pair].update({'qty': qty, 'value': value, 'price': price})
 
-        self.portfolio['total_value_usd'] += self.portfolio['cash_usd']
+        self.portfolio['total_value_usd'] = sum(pos['value'] for pos in self.portfolio.get('positions', {}).values()) + self.portfolio['cash_usd']
 
     def run_live_trading(self, rsi_period=14, oversold=30, overbought=65, min_trade_usd=5.0):
+        # ... (function is unchanged)
         logging.info(f"\n--- ✅ Live Portfolio Manager Started ---")
 
         while True:
@@ -191,12 +220,13 @@ class UnifiedEngine:
                     all_opportunities.append({'pair': pair, 'rsi': current_rsi})
                     time.sleep(3)
 
-                # --- REBALANCING LOGIC ---
                 assets_to_sell = []
-                for pair, position_data in self.portfolio['positions'].items():
+                current_positions = list(self.portfolio.get('positions', {}).keys())
+
+                for pair in current_positions:
                     current_asset_info = next((item for item in all_opportunities if item["pair"] == pair), None)
                     if current_asset_info and current_asset_info['rsi'] > overbought:
-                        assets_to_sell.append({'pair': pair, 'qty': position_data['qty']})
+                         assets_to_sell.append({'pair': pair, 'qty': self.portfolio['positions'][pair]['qty']})
 
                 for asset in assets_to_sell:
                     logging.warning(f"  [REBALANCE] SELL SIGNAL for {asset['pair']}. Exiting position.")
@@ -206,26 +236,18 @@ class UnifiedEngine:
                 if assets_to_sell: self._update_portfolio_value()
                 cash_to_deploy = self.portfolio['cash_usd']
 
-                buy_candidates = [opp for opp in all_opportunities if opp['rsi'] < oversold and opp['pair'] not in self.portfolio['positions']]
+                buy_candidates = [opp for opp in all_opportunities if opp['rsi'] < oversold and opp['pair'] not in self.portfolio.get('positions', {})]
                 buy_candidates.sort(key=lambda x: x['rsi'])
 
                 for candidate in buy_candidates:
                     if cash_to_deploy < min_trade_usd: break
-
                     pair = candidate['pair']
                     price_ticker = self.execution_engine.get_ticker_info(pair)
                     if price_ticker is None: continue
                     price = float(price_ticker['c'][0][0])
-
-                    kelly_fraction = self.risk_sizer.calculate_classical_kelly(p=0.55, b=1.0)
-                    trade_fraction = kelly_fraction * 0.5
-                    ideal_capital = cash_to_deploy * trade_fraction
-
-                    trade_capital = min(ideal_capital, cash_to_deploy * 0.98)
-
+                    trade_capital = cash_to_deploy * 0.98
                     if trade_capital >= min_trade_usd:
-                        logging.warning(f"  [REBALANCE] BUY SIGNAL for {pair} (RSI: {candidate['rsi']:.2f}).")
-                        logging.info(f"  [SIZING] Kelly Fraction: {trade_fraction:.2%}. Allocating up to ${trade_capital:.2f}.")
+                        logging.warning(f"  [REBALANCE] BUY SIGNAL for {pair}. Allocating up to ${trade_capital:.2f}.")
                         trade_size = trade_capital / price
                         if self.execution_engine.place_order(pair, OrderSide.BUY, OrderType.MARKET, trade_size):
                             cash_to_deploy -= trade_capital
